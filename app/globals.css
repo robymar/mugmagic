@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+:root {
+  /* Base Colors */
+  --background: #f0f0f3;
+  --foreground: #2d3748;
+  
+  /* Brand Colors */
+  --primary: #667eea;
+  --secondary: #764ba2;
+  --accent: #f093fb;
+  
+  /* Kids Mode Colors */
+  --kid-primary: #ff6b9d;
+  --kid-secondary: #ffc371;
+  --kid-accent: #84fab0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Claymorphism Classes */
+@layer components {
+  .clay-card {
+    background: #f0f0f3;
+    border-radius: 24px;
+    box-shadow: 
+      8px 8px 16px #c8c8cb,
+      -8px -8px 16px #ffffff;
+    transition: all 0.3s ease;
+  }
+  
+  .clay-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 
+      12px 12px 20px #c8c8cb,
+      -12px -12px 20px #ffffff;
+  }
+
+  .clay-panel {
+    background: #f0f0f3;
+    border-radius: 24px;
+    box-shadow: 
+      inset 8px 8px 16px #c8c8cb,
+      inset -8px -8px 16px #ffffff;
+  }
+
+  .clay-button {
+    @apply px-6 py-3 font-bold text-white rounded-2xl cursor-pointer select-none;
+    background: linear-gradient(145deg, var(--primary), var(--secondary));
+    box-shadow: 
+      5px 5px 10px #c8c8cb,
+      -5px -5px 10px #ffffff;
+    transition: all 0.2s ease;
+    border: none;
+  }
+
+  .clay-button:hover {
+     transform: scale(1.02);
+     filter: brightness(1.1);
+  }
+
+  .clay-button:active {
+    box-shadow: inset 4px 4px 8px rgba(0,0,0,0.2);
+    transform: scale(0.98);
+  }
+  
+  .clay-button-kids {
+    @apply px-8 py-4 text-xl font-black text-white rounded-[30px] cursor-pointer select-none;
+    background: linear-gradient(145deg, var(--kid-primary), var(--kid-secondary));
+    box-shadow: 
+      6px 6px 0px rgba(0,0,0,0.15),
+      0px 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+    transform: translateY(0);
+  }
+  
+  .clay-button-kids:active {
+    transform: translateY(4px);
+    box-shadow: 
+      2px 2px 0px rgba(0,0,0,0.15),
+      0px 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .clay-button-secondary {
+    @apply px-6 py-3 font-bold text-gray-600 rounded-2xl cursor-pointer select-none;
+    background: #f0f0f3;
+    box-shadow: 
+      5px 5px 10px #c8c8cb,
+      -5px -5px 10px #ffffff;
+  }
+  
+  .clay-button-secondary:active {
+    box-shadow: inset 4px 4px 8px #c8c8cb, inset -4px -4px 8px #ffffff;
+  }
+
+  .clay-input {
+    @apply w-full px-4 py-3 bg-[#f0f0f3] rounded-xl outline-none text-[#2d3748];
+    box-shadow: inset 4px 4px 8px #d1d1db, inset -4px -4px 8px #ffffff;
+    border: none;
+  }
+  
+  .clay-input:focus {
+    box-shadow: inset 6px 6px 10px #c8c8cb, inset -6px -6px 10px #ffffff;
+  }
+}
+
+/* Animations */
+@keyframes bounce-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-bounce-gentle {
+  animation: bounce-gentle 2s infinite ease-in-out;
+}
