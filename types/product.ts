@@ -46,6 +46,7 @@ export interface Product {
     variants?: ProductVariant[];
     tags: string[];
     inStock: boolean;
+    stockQuantity?: number; // Added for precise tracking
     featured: boolean;
     bestseller?: boolean;
     new?: boolean;

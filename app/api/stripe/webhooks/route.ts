@@ -98,6 +98,62 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                 }
             });
 
+            // Retrieve order items associated with this payment intent
+            const { data: orderData, error: orderError } = await supabaseAdmin
+                .from('orders')
+                .select('id')
+                .eq('payment_intent_id', paymentIntent.id)
+                .single();
+
+            if (orderError || !orderData) {
+                logError('Failed to retrieve order for payment intent', {
+                    data: { error: orderError?.message, paymentIntentId: paymentIntent.id }
+                });
+                // Continue to update payment status even if items retrieval fails
+            } else {
+                const orderId = orderData.id;
+                const { data: items, error: itemsError } = await supabaseAdmin
+                    .from('order_items')
+                    .select('product_id, quantity')
+                    .eq('order_id', orderId);
+
+                if (itemsError) {
+                    logError('Failed to retrieve order items for order', {
+                        data: { error: itemsError.message, orderId: orderId }
+                    });
+                } else if (items && items.length > 0) {
+                    // CRITICAL: Decrement Stock Atomically
+                    // This prevents race conditions where two users buy the last item
+                    for (const item of items) {
+                        const { data: stockSuccess, error: stockError } = await supabaseAdmin
+                            .rpc('decrement_stock', {
+                                row_id: item.product_id,
+                                quantity_to_subtract: item.quantity
+                            });
+
+                        if (stockError) {
+                            logError('Failed to decrement stock (RPC Error)', {
+                                data: { productId: item.product_id, error: stockError.message }
+                            });
+                        } else if (!stockSuccess) {
+                            logError('Failed to decrement stock (Insufficient Stock)', {
+                                data: { productId: item.product_id, requested: item.quantity }
+                            });
+                            // Note: In a real app, you might flag this order for manual review
+                            // or trigger a refund if stock is critical.
+                        } else {
+                            logInfo('Stock decremented successfully', {
+                                data: { productId: item.product_id, quantity: item.quantity }
+                            });
+                        }
+                    }
+                } else {
+                    logWarn('No order items found for order', {
+                        data: { orderId: orderId }
+                    });
+                }
+            }
+
             // Update order status to 'paid'
             const { error } = await supabaseAdmin
                 .from('orders')
@@ -115,6 +171,34 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                 logInfo('✅ Order marked as PAID in database', {
                     data: { paymentIntentId: paymentIntent.id }
                 });
+
+                // ---------------------------------------------------------
+                // CRITICAL: Atomic Stock Deduction
+                // ---------------------------------------------------------
+                const { data: orderItems, error: itemsError } = await supabaseAdmin
+                    .from('order_items')
+                    .select('product_id, quantity')
+                    .eq('order_id', paymentIntent.id);
+
+                if (orderItems) {
+                    for (const item of orderItems) {
+                        const { data: success, error: stockError } = await supabaseAdmin
+                            .rpc('decrement_stock', {
+                                row_id: item.product_id,
+                                quantity_to_subtract: item.quantity
+                            });
+
+                        if (stockError || !success) {
+                            logError('⚠️ Failed to decrement stock', {
+                                data: {
+                                    productId: item.product_id,
+                                    error: stockError?.message || 'Insufficient stock'
+                                }
+                            });
+                        }
+                    }
+                    logInfo('📦 Stock inventory updated');
+                }
             }
 
             break;
