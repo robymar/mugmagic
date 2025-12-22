@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getProductsFromDB, createProductInDB } from '@/lib/db/products';
 import { Product } from '@/types/product';
 import { v4 as uuidv4 } from 'uuid';
+import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
+import { productSchema } from '@/lib/validation-schemas';
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET() {
     try {
@@ -15,35 +18,77 @@ export async function GET() {
     }
 }
 
-export async function POST(request: Request) {
-    try {
-        const body = await request.json();
+// Rate limiting for product creation
+const createProductAttempts = new Map<string, { count: number; resetTime: number }>();
 
-        // Basic validation
-        if (!body.name || !body.basePrice) {
-            return NextResponse.json(
-                { error: 'Name and Base Price are required' },
-                { status: 400 }
-            );
+function checkProductCreationRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
+    const now = Date.now();
+    const windowMs = 60000;
+    const maxAttempts = 10;
+
+    if (createProductAttempts.size > 1000) {
+        for (const [key, value] of createProductAttempts.entries()) {
+            if (value.resetTime < now) createProductAttempts.delete(key);
         }
+    }
+
+    const attempt = createProductAttempts.get(ip);
+    if (!attempt || attempt.resetTime < now) {
+        createProductAttempts.set(ip, { count: 1, resetTime: now + windowMs });
+        return { allowed: true };
+    }
+
+    if (attempt.count >= maxAttempts) {
+        return { allowed: false, resetTime: attempt.resetTime };
+    }
+
+    attempt.count++;
+    return { allowed: true };
+}
+
+export async function POST(request: Request) {
+    // Check authentication (admin only)
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return errorResponse('Unauthorized', 401);
+    }
+
+    // Rate limiting
+    const ip = getIP(request);
+    const rateLimitCheck = checkProductCreationRateLimit(ip);
+
+    if (!rateLimitCheck.allowed) {
+        const retryAfter = Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000);
+        return NextResponse.json(
+            { error: 'Too many requests', retryAfter },
+            { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
+        );
+    }
+
+    try {
+        // Validate request with Zod
+        const { data, error: validationError } = await validateRequest(request, productSchema);
+        if (validationError) return validationError;
 
         const newProduct: Product = {
-            id: body.id || uuidv4(),
-            slug: body.slug || body.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
-            name: body.name,
-            description: body.description || '',
-            longDescription: body.longDescription || '',
-            category: body.category || 'mug',
-            basePrice: Number(body.basePrice),
-            compareAtPrice: body.compareAtPrice ? Number(body.compareAtPrice) : undefined,
-            images: body.images || { thumbnail: '', gallery: [] },
-            specifications: body.specifications || {},
-            variants: body.variants || [],
-            tags: body.tags || [],
-            inStock: body.inStock ?? true,
-            featured: body.featured ?? false,
-            bestseller: body.bestseller ?? false,
-            new: body.new ?? true,
+            id: data.id || uuidv4(),
+            slug: data.slug || data.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+            name: data.name,
+            description: data.description || '',
+            longDescription: data.longDescription || '',
+            category: data.category,
+            basePrice: Number(data.basePrice),
+            compareAtPrice: data.compareAtPrice ? Number(data.compareAtPrice) : undefined,
+            images: data.images || { thumbnail: '', gallery: [] },
+            specifications: data.specifications || {},
+            variants: data.variants || [],
+            tags: data.tags || [],
+            inStock: data.inStock ?? true,
+            featured: data.featured ?? false,
+            bestseller: data.bestseller ?? false,
+            new: data.new ?? true,
             rating: 0,
             reviewCount: 0
         };
