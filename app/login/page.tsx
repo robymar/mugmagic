@@ -21,7 +21,7 @@ export default function LoginPage() {
         setError(null);
 
         try {
-            console.log('🚀 Initiating Sign Up...');
+
             // Determine the base URL: prefer env var, fallback to current origin, but ensure consistency
             const getURL = () => {
                 let url =
@@ -42,7 +42,7 @@ export default function LoginPage() {
             };
 
             const redirectUrl = `${getURL()}/auth/callback`;
-            console.log('🔗 Using Redirect URL:', redirectUrl);
+
 
             const { error, data } = await supabase.auth.signUp({
                 email,
@@ -52,22 +52,17 @@ export default function LoginPage() {
                 },
             });
 
-            console.log('🍪 Cookies after Sign Up call:', document.cookie);
-            if (document.cookie.includes('code-verifier')) {
-                console.log('✅ PKCE Code Verifier cookie detected!');
-            } else {
-                console.warn('⚠️ PKCE Code Verifier cookie NOT detected!');
-            }
+
 
             if (error) throw error;
 
             if (data.session) {
                 // Auto-confirmed
-                console.log('✅ Auto-confirmed session');
+
                 window.location.href = '/profile';
             } else {
                 // Confirmation required
-                console.log('✉️ Confirmation email sent');
+
                 setCheckEmail(true);
             }
         } catch (err: any) {

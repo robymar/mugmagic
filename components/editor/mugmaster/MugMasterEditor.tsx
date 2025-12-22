@@ -1,4 +1,6 @@
 "use client";
+
+import { createClient } from '@/utils/supabase/client';
 // MugMaster Editor Container
 
 import React, { useState } from 'react';
@@ -118,7 +120,7 @@ export default function MugMasterEditor({ productId, initialDesign, designId }: 
         // 1. Check Auth (Client-side check)
         // Ideally we should check if user is logged in. 
         // For now, let's try to get the user from Supabase.
-        const { createClient } = require('@/lib/supabase'); // Dynamic import to avoid top-level issues if any
+        // const { createClient } = require('@/lib/supabase'); // Dynamic import removed
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
 

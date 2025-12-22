@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-    console.error('🚀 [API Route] Login Request received. Env:', process.env.NODE_ENV);
+
 
     try {
         const formData = await request.json();
@@ -47,16 +47,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: error.message }, { status: 401 });
         }
 
-        console.error('✅ Login successful for:', email);
-        console.error('📦 Session Data:', {
-            user: data.session?.user.id,
-            expires_at: data.session?.expires_at,
-            cookie_count: cookiesToSetOnResponse.length
-        });
 
-        if (cookiesToSetOnResponse.length === 0) {
-            console.error('⚠️ WARNING: No cookies captured from Supabase sign-in!');
-        }
+
+
 
         // Apply captured cookies directly to the cookieStore (Next.js 15 native way)
         cookiesToSetOnResponse.forEach(({ name, value, options }) => {
@@ -64,12 +57,11 @@ export async function POST(request: Request) {
                 ...options,
                 sameSite: 'lax',
                 path: '/',
-                // FORCE secure: false for localhost debugging. 
-                secure: false,
+                secure: process.env.NODE_ENV === 'production',
             };
             delete newOptions.domain;
 
-            console.error(`🍪 [API] Setting cookie via cookieStore: ${name}`, newOptions);
+
             cookieStore.set(name, value, newOptions);
         });
 

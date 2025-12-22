@@ -12,7 +12,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 //Types
 type CheckoutStep = 'shipping' | 'payment';

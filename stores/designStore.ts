@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as fabric from 'fabric';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { v4 as uuidv4 } from 'uuid'; // Ensure we use the v6 import style
 
 interface DesignState {

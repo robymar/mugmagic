@@ -13,28 +13,20 @@ export default async function ProfilePage() {
     // Create Server Client manually
     const supabase = await createClient();
     const allCookies = cookieStore.getAll();
-    console.log('🍪 [Profile Page] All Cookies:', allCookies.map(c => c.name));
+
 
     // Validar sesión
     const { data: { user }, error } = await supabase.auth.getUser();
 
     // Debug user session
     if (!user) {
-        console.error('❌ [Profile Page] No Session Found');
-        console.error('🍪 [Profile Page] Cookies Available:', allCookies);
+        // Log removed
     } else {
-        console.log('✅ [Profile Page] User Found:', user.email);
+        // Log removed
     }
 
-    console.log('🔍 Profile Page - User check:', {
-        hasUser: !!user,
-        email: user?.email,
-        error: error?.message,
-        cookies: cookieStore.getAll().map(c => c.name).join(', ')
-    });
-
     if (!user) {
-        console.log('❌ Profile: No user found, cookies:', cookieStore.getAll().map(c => ({ name: c.name, value: c.value.substring(0, 50) })));
+
 
         // Instead of redirecting, show debug info
         return (

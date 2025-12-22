@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface ImageUploadProps {
     onUpload: (url: string) => void;

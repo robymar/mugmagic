@@ -9,7 +9,8 @@ import { useCartStore } from '@/stores/cartStore';
 import { ArrowLeft, Save, ShoppingCart, Type, Image as ImageIcon, Smile, Box, Monitor } from 'lucide-react';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { PRODUCTS } from '@/data/products';
 
 interface EditorUIProps {
     productId: string;
@@ -38,12 +39,21 @@ export default function EditorUI({ productId }: EditorUIProps) {
                 multiplier: 2 // Better quality
             });
 
+            // Find product
+            const product = PRODUCTS.find(p => p.slug === productId || p.id === productId);
+            if (!product) {
+                toast.error('Product not found');
+                return;
+            }
+
             addItem({
                 id: uuidv4(),
-                productId,
+                productId: product.id,
+                product,
                 quantity: 1,
-                price: 1499, // cents
-                previewUrl
+                price: product.basePrice * 100, // cents (assuming basePrice is dollars/euros)
+                previewUrl,
+                designId: uuidv4(), // Fix: add ignored designId for custom item
             });
 
             // Open cart
@@ -90,7 +100,7 @@ export default function EditorUI({ productId }: EditorUIProps) {
                 </div>
 
                 <div className="flex gap-4">
-                    <Button variant="secondary" onClick={() => alert('Save coming soon!')}>
+                    <Button variant="secondary" onClick={() => toast.success('Save coming soon!', { icon: '🚧' })}>
                         <Save size={18} /> Save Design
                     </Button>
                     <Button onClick={handleAddToCart}>

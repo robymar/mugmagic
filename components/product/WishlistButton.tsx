@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Heart } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 import { toast } from 'react-hot-toast';
 
 interface WishlistButtonProps {

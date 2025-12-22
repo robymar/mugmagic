@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 import { Product } from '@/types/product';
 
 // Convert DB row to Product type
@@ -26,7 +26,7 @@ function mapRowToProduct(row: any): Product {
 }
 
 export async function getProductsFromDB() {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -41,7 +41,7 @@ export async function getProductsFromDB() {
 }
 
 export async function getProductBySlugFromDB(slug: string) {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -57,7 +57,7 @@ export async function getProductBySlugFromDB(slug: string) {
 }
 
 export async function createProductInDB(product: Product) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const dbRow = {
         id: product.id,
@@ -94,7 +94,7 @@ export async function createProductInDB(product: Product) {
 }
 
 export async function updateProductInDB(id: string, product: Partial<Product>) {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Convert Partial<Product> to DB columns
     const dbRow: any = {};
@@ -129,7 +129,7 @@ export async function updateProductInDB(id: string, product: Partial<Product>) {
 }
 
 export async function deleteProductInDB(id: string) {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { error } = await supabase
         .from('products')
         .delete()
