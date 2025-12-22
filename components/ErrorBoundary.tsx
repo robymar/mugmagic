@@ -1,7 +1,6 @@
 'use client';
 
-import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import React, { Component, ReactNode } from 'react';
 
 interface Props {
     children: ReactNode;
@@ -10,46 +9,34 @@ interface Props {
 
 interface State {
     hasError: boolean;
-    error?: Error;
-    errorInfo?: ErrorInfo;
+    error: Error | null;
 }
 
 /**
- * Error Boundary Component
- * Catches errors in child components and displays fallback UI
- * Prevents entire app from crashing
+ * Error Boundary component to catch React errors and display fallback UI.
+ * 
+ * @example
+ * <ErrorBoundary>
+ *   <YourComponent />
+ * </ErrorBoundary>
  */
 export class ErrorBoundary extends Component<Props, State> {
     constructor(props: Props) {
         super(props);
-        this.state = { hasError: false };
+        this.state = { hasError: false, error: null };
     }
 
     static getDerivedStateFromError(error: Error): State {
-        // Update state so the next render will show the fallback UI
         return { hasError: true, error };
     }
 
-    componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        // Log error to error reporting service
-        console.error('Error caught by boundary:', error, errorInfo);
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+        // Log error to console in development
+        console.error('Error Boundary caught:', error, errorInfo);
 
-        this.setState({
-            error,
-            errorInfo
-        });
-
-        // TODO: Send to error tracking service (Sentry, LogRocket, etc)
-        // sentryLog(error, errorInfo);
+        // TODO: Log to error tracking service (Sentry, LogRocket, etc.)
+        // logErrorToService(error, errorInfo);
     }
-
-    handleReset = () => {
-        this.setState({ hasError: false, error: undefined, errorInfo: undefined });
-    };
-
-    handleGoHome = () => {
-        window.location.href = '/';
-    };
 
     render() {
         if (this.state.hasError) {
@@ -60,68 +47,56 @@ export class ErrorBoundary extends Component<Props, State> {
 
             // Default fallback UI
             return (
-                <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50 p-4">
-                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-                        <div className="flex flex-col items-center text-center">
-                            {/* Icon */}
-                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                                <AlertTriangle className="w-8 h-8 text-red-600" />
-                            </div>
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+                    <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg
+                                className="w-8 h-8 text-red-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                />
+                            </svg>
+                        </div>
 
-                            {/* Title */}
-                            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                                Oops! Something went wrong
-                            </h1>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                            Oops! Something went wrong
+                        </h1>
 
-                            {/* Description */}
-                            <p className="text-gray-600 mb-6">
-                                We're sorry for the inconvenience. An unexpected error occurred.
-                            </p>
+                        <p className="text-gray-600 mb-6">
+                            We're sorry for the inconvenience. Please try refreshing the page.
+                        </p>
 
-                            {/* Error details (only in development) */}
-                            {process.env.NODE_ENV === 'development' && this.state.error && (
-                                <div className="w-full mb-6 p-4 bg-gray-100 rounded-lg text-left">
-                                    <p className="text-sm font-mono text-red-600 break-all">
-                                        {this.state.error.toString()}
-                                    </p>
-                                    {this.state.errorInfo && (
-                                        <details className="mt-2">
-                                            <summary className="text-sm text-gray-700 cursor-pointer">
-                                                Stack trace
-                                            </summary>
-                                            <pre className="text-xs text-gray-600 mt-2 overflow-auto max-h-40">
-                                                {this.state.errorInfo.componentStack}
-                                            </pre>
-                                        </details>
-                                    )}
-                                </div>
-                            )}
+                        {process.env.NODE_ENV === 'development' && this.state.error && (
+                            <details className="text-left bg-gray-50 p-4 rounded-lg mb-4">
+                                <summary className="cursor-pointer font-semibold text-sm text-gray-700 mb-2">
+                                    Error Details (Dev Only)
+                                </summary>
+                                <pre className="text-xs text-red-600 overflow-auto">
+                                    {this.state.error.toString()}
+                                </pre>
+                            </details>
+                        )}
 
-                            {/* Actions */}
-                            <div className="flex gap-3 w-full">
-                                <button
-                                    onClick={this.handleReset}
-                                    className="flex-1 px-6 py-3 border-2 border-blue-600 text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <RefreshCw size={20} />
-                                    Try Again
-                                </button>
-                                <button
-                                    onClick={this.handleGoHome}
-                                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Home size={20} />
-                                    Go Home
-                                </button>
-                            </div>
-
-                            {/* Support link */}
-                            <p className="text-sm text-gray-500 mt-6">
-                                If the problem persists, please{' '}
-                                <a href="/contact" className="text-blue-600 hover:underline">
-                                    contact support
-                                </a>
-                            </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Refresh Page
+                            </button>
+                            <button
+                                onClick={() => window.location.href = '/'}
+                                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                                Go Home
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -130,20 +105,4 @@ export class ErrorBoundary extends Component<Props, State> {
 
         return this.props.children;
     }
-}
-
-/**
- * Functional wrapper for convenience
- */
-export function withErrorBoundary<P extends object>(
-    Component: React.ComponentType<P>,
-    fallback?: ReactNode
-) {
-    return function WithErrorBoundary(props: P) {
-        return (
-            <ErrorBoundary fallback={fallback}>
-                <Component {...props} />
-            </ErrorBoundary>
-        );
-    };
 }
