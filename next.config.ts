@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
 
+// Uncomment to analyze bundle (npm install @next/bundle-analyzer first)
+// const withBundleAnalyzer = require('@next/bundle-analyzer')({
+//   enabled: process.env.ANALYZE === 'true',
+// });
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@react-three/fiber', '@react-three/drei', 'three'],
+
+  // Performance Optimizations
+  compress: true,
+  poweredByHeader: false,
 
   // Image Configuration
   images: {
@@ -13,6 +22,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
+
+  // Experimental Features for Performance
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'framer-motion'],
   },
 
   // Security Headers
@@ -76,4 +92,5 @@ const nextConfig: NextConfig = {
   }
 };
 
+// export default withBundleAnalyzer(nextConfig); // Use when analyzing
 export default nextConfig;

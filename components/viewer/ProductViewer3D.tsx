@@ -4,13 +4,14 @@
 import React, { useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
-import * as THREE from 'three';
+// Import only what we need from THREE to reduce bundle size
+import { Mesh, MeshStandardMaterial, Texture, DoubleSide, BackSide } from 'three';
 import { useDesignStore } from '@/stores/designStore';
 import { useCanvasTexture } from './useCanvasTexture';
 
-const MugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null; mugColor: string }) => {
-    const meshRef = useRef<THREE.Mesh>(null);
-    const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+const MugMesh = ({ texture, mugColor }: { texture: Texture | null; mugColor: string }) => {
+    const meshRef = useRef<Mesh>(null);
+    const materialRef = useRef<MeshStandardMaterial>(null);
 
     // Force material update when texture changes
     useEffect(() => {
@@ -44,7 +45,7 @@ const MugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null; mugColo
                     ref={materialRef}
                     map={texture}
                     color={mugColor}  // Color base de la taza
-                    side={THREE.DoubleSide}
+                    side={DoubleSide}
                     roughness={0.2}
                     metalness={0.1}
                 />
@@ -55,7 +56,7 @@ const MugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null; mugColo
                 <cylinderGeometry args={[0.92, 0.92, 2.3, 64, 1, true]} />
                 <meshStandardMaterial
                     color="#ffffff"  // Interior siempre blanco
-                    side={THREE.BackSide}
+                    side={BackSide}
                     roughness={0.3}
                     metalness={0.05}
                 />
