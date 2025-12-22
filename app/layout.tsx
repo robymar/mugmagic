@@ -5,6 +5,7 @@ import { CartDrawer } from "@/components/shop/CartDrawer";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from 'react-hot-toast';
+import CookieConsent from "@/components/ui/CookieConsent";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,6 +80,9 @@ export default function RootLayout({
             },
           }}
         />
+
+        {/* GDPR Cookie Consent */}
+        <CookieConsent />
       </body>
     </html>
   );
