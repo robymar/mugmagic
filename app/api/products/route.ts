@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
 import { productSchema } from '@/lib/validation-schemas';
 import { createClient } from '@/utils/supabase/server';
+import { sanitizeProductData } from '@/lib/sanitization';
 
 export async function GET() {
     try {
@@ -72,23 +73,26 @@ export async function POST(request: Request) {
         const { data, error: validationError } = await validateRequest(request, productSchema);
         if (validationError) return validationError;
 
+        // Sanitize product data to prevent XSS
+        const sanitizedData = sanitizeProductData(data);
+
         const newProduct: Product = {
-            id: data.id || uuidv4(),
-            slug: data.slug || data.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
-            name: data.name,
-            description: data.description || '',
-            longDescription: data.longDescription || '',
-            category: data.category,
-            basePrice: Number(data.basePrice),
-            compareAtPrice: data.compareAtPrice ? Number(data.compareAtPrice) : undefined,
-            images: data.images || { thumbnail: '', gallery: [] },
-            specifications: data.specifications || {},
-            variants: data.variants || [],
-            tags: data.tags || [],
-            inStock: data.inStock ?? true,
-            featured: data.featured ?? false,
-            bestseller: data.bestseller ?? false,
-            new: data.new ?? true,
+            id: sanitizedData.id || uuidv4(),
+            slug: sanitizedData.slug || sanitizedData.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+            name: sanitizedData.name,
+            description: sanitizedData.description || '',
+            longDescription: sanitizedData.longDescription || '',
+            category: sanitizedData.category,
+            basePrice: Number(sanitizedData.basePrice),
+            compareAtPrice: sanitizedData.compareAtPrice ? Number(sanitizedData.compareAtPrice) : undefined,
+            images: sanitizedData.images || { thumbnail: '', gallery: [] },
+            specifications: sanitizedData.specifications || {},
+            variants: sanitizedData.variants || [],
+            tags: sanitizedData.tags || [],
+            inStock: sanitizedData.inStock ?? true,
+            featured: sanitizedData.featured ?? false,
+            bestseller: sanitizedData.bestseller ?? false,
+            new: sanitizedData.new ?? true,
             rating: 0,
             reviewCount: 0
         };
