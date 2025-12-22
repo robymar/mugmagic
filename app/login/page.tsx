@@ -24,15 +24,18 @@ export default function LoginPage() {
 
             // Determine the base URL: prefer env var, fallback to current origin, but ensure consistency
             const getURL = () => {
-                let url =
-                    process.env.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production env.
-                    process.env.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
-                    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'); // Fallback logic
+                // Get the site URL dynamically
+                const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+                    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
-                // Make sure to include `https://` when not localhost.
-                url = url.includes('http') ? url : `https://${url}`;
-                // Make sure to include `http://` on localhost
-                if (url.includes('localhost')) {
+                let url = `${siteUrl}/auth/callback`;
+
+                // Ensure correct protocol in production
+                if (process.env.NODE_ENV === 'production' && !url.startsWith('https://')) {
+                    url = url.replace('http://', 'https://');
+                }
+                // Ensure http:// for localhost
+                if (url.includes('localhost') && !url.startsWith('http://')) {
                     url = url.replace('https://', 'http://');
                 }
 
