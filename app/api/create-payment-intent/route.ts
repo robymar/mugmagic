@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { PRODUCTS } from '@/data/products';
 import { CartItem } from '@/stores/cartStore';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { validateRequest, errorResponse } from '@/lib/api-utils';
+import { createPaymentIntentSchema } from '@/lib/validation-schemas';
 
 // Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -57,10 +59,14 @@ const calculateOrderAmount = (items: CartItem[], shippingMethodId: string) => {
 
 export async function POST(req: Request) {
     try {
-        const { items, shippingInfo, shippingMethod, userId } = await req.json();
+        // Validate request body
+        const { data, error: validationError } = await validateRequest(req, createPaymentIntentSchema);
+        if (validationError) return validationError;
+
+        const { items, shippingInfo, shippingMethod, userId } = data;
 
         if (!items || items.length === 0) {
-            return NextResponse.json({ error: 'No items in cart' }, { status: 400 });
+            return errorResponse('No items in cart', 400);
         }
 
         // Calculate amount in cents
