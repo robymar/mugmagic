@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, Pencil, Trash2, Search, Package } from 'lucide-react';
 import { Product } from '@/types/product';
 
@@ -111,12 +112,14 @@ export default function AdminProductsPage() {
                                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden">
+                                                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden relative">
                                                     {product.images.thumbnail && (
-                                                        <img
+                                                        <Image
                                                             src={product.images.thumbnail}
                                                             alt={product.name}
-                                                            className="w-full h-full object-cover"
+                                                            fill
+                                                            className="object-cover"
+                                                            sizes="48px"
                                                         />
                                                     )}
                                                 </div>

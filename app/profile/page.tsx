@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Package, User, LogOut, ChevronRight } from 'lucide-react';
 import { cookies } from 'next/headers';
 
@@ -125,12 +126,13 @@ export default async function ProfilePage() {
                                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {savedDesigns.map((design) => (
                                         <div key={design.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-md transition-all">
-                                            <div className="aspect-square relative bg-gray-50">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img
+                                            <div className="aspect-square relative bg-gray-50 overflow-hidden">
+                                                <Image
                                                     src={design.preview_url || '/placeholder-mug.png'}
                                                     alt={design.name}
-                                                    className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform"
+                                                    fill
+                                                    className="object-contain p-4 group-hover:scale-105 transition-transform"
+                                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                                 />
                                             </div>
                                             <div className="p-4">
