@@ -7,10 +7,18 @@ import { productSchema } from '@/lib/validation-schemas';
 import { createClient } from '@/utils/supabase/server';
 import { sanitizeProductData } from '@/lib/sanitization';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
-        const products = await getProductsFromDB();
-        return NextResponse.json(products);
+        const { searchParams } = new URL(request.url);
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '20');
+
+        // Validation for reasonable limits
+        const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const safePage = Math.max(page, 1);
+
+        const result = await getProductsFromDB(safePage, safeLimit);
+        return NextResponse.json(result);
     } catch (error) {
         return NextResponse.json(
             { error: 'Failed to fetch products' },
