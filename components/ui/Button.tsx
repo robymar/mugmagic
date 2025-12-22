@@ -37,10 +37,18 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 )}
                 onClick={handleClick}
                 disabled={isLoading || props.disabled}
+                aria-disabled={isLoading || props.disabled}
+                aria-busy={isLoading}
                 {...props as any}
             >
                 {isLoading ? (
-                    <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                    <>
+                        <span
+                            className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"
+                            aria-hidden="true"
+                        />
+                        <span className="sr-only">Loading...</span>
+                    </>
                 ) : children}
             </motion.button>
         );

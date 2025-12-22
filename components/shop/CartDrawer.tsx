@@ -15,7 +15,17 @@ export const CartDrawer = () => {
 
     React.useEffect(() => {
         setMounted(true);
-    }, []);
+
+        // Handle escape key to close drawer
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                closeCart();
+            }
+        };
+
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, closeCart]);
 
     if (!mounted) return null;
 
@@ -46,6 +56,7 @@ export const CartDrawer = () => {
                         exit={{ opacity: 0 }}
                         onClick={closeCart}
                         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+                        aria-hidden="true"
                     />
                 )}
             </AnimatePresence>
@@ -54,6 +65,9 @@ export const CartDrawer = () => {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Shopping cart"
                         initial={{ x: '100%' }}
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
@@ -77,9 +91,10 @@ export const CartDrawer = () => {
                             </div>
                             <button
                                 onClick={closeCart}
+                                aria-label="Close shopping cart"
                                 className="p-2 hover:bg-white rounded-lg transition-colors"
                             >
-                                <X size={24} className="text-gray-600" />
+                                <X size={24} className="text-gray-600" aria-hidden="true" />
                             </button>
                         </div>
 
@@ -156,8 +171,8 @@ export const CartDrawer = () => {
                                                 onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
                                                 placeholder="Enter code"
                                                 className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${promoError
-                                                        ? 'border-red-300 focus:ring-red-500'
-                                                        : 'border-gray-300 focus:ring-blue-500'
+                                                    ? 'border-red-300 focus:ring-red-500'
+                                                    : 'border-gray-300 focus:ring-blue-500'
                                                     }`}
                                             />
                                             <button
