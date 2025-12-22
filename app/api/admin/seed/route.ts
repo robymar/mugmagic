@@ -1,10 +1,33 @@
 import { NextResponse } from 'next/server';
 import { createProductInDB } from '@/lib/db/products';
 import { PRODUCTS } from '@/data/products';
+import { requireAuth } from '@/lib/api-utils';
 
-export async function POST() {
+export async function POST(request: Request) {
     try {
-        console.log('Starting DB seed...');
+        // CRITICAL: Only authenticated admin users should seed the database
+        const user = await requireAuth(request);
+
+        if (!user) {
+            return NextResponse.json(
+                { error: 'Unauthorized - Admin access required' },
+                { status: 401 }
+            );
+        }
+
+        // SECURITY: In production, check if user has admin role
+        // For now, any authenticated user can seed (development only)
+        if (process.env.NODE_ENV === 'production') {
+            // TODO: Check user.role === 'admin' or similar
+            return NextResponse.json(
+                { error: 'Seed endpoint disabled in production' },
+                { status: 403 }
+            );
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Starting DB seed...');
+        }
 
         const results = [];
 

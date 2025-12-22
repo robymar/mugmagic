@@ -165,3 +165,55 @@ export function isLocalhost(request: Request): boolean {
     const origin = request.headers.get('origin') || '';
     return origin.includes('localhost') || origin.includes('127.0.0.1');
 }
+
+/**
+ * Requires authentication for API routes.
+ * Extracts user from Supabase session.
+ * 
+ * @param request - The incoming request
+ * @returns User object if authenticated, null otherwise
+ * 
+ * @example
+ * const user = await requireAuth(request);
+ * if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+ */
+export async function requireAuth(request: Request): Promise<any | null> {
+    try {
+        const { createServerClient } = await import('@supabase/ssr');
+        const { cookies } = await import('next/headers');
+
+        const cookieStore = await cookies();
+
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() {
+                        return cookieStore.getAll();
+                    },
+                    setAll(cookiesToSet: any[]) {
+                        try {
+                            cookiesToSet.forEach(({ name, value, options }) =>
+                                cookieStore.set(name, value, options)
+                            );
+                        } catch {
+                            // Cookie setting can fail in middleware
+                        }
+                    },
+                },
+            }
+        );
+
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error || !user) {
+            return null;
+        }
+
+        return user;
+    } catch (error) {
+        console.error('Auth check error:', error);
+        return null;
+    }
+}
