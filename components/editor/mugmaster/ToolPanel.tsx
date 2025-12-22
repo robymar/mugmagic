@@ -4,6 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActiveTab } from './MugMasterEditor';
 import { AvatarBuilder } from './AvatarBuilder';
+import { FontSelector } from './FontSelector';
 import { useDesignStore } from '@/stores/designStore';
 import { Type, Image as ImageIcon, Plus } from 'lucide-react';
 
@@ -72,26 +73,26 @@ export const ToolPanel = ({ activeTab }: ToolPanelProps) => {
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                <h3 className="font-bold text-gray-700">Font Styles</h3>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {['Inter', 'Pacifico', 'Roboto', 'Oswald'].map(font => (
-                                        <button
-                                            key={font}
-                                            className="h-16 rounded-xl bg-gray-50 hover:bg-gray-100 border border-transparent hover:border-gray-200 flex items-center justify-center transition-all"
-                                            onClick={() => {
-                                                if (activeObject && 'fontFamily' in activeObject) {
-                                                    activeObject.set('fontFamily', font);
-                                                    canvas?.requestRenderAll();
-                                                }
-                                            }}
-                                        >
-                                            <span style={{ fontFamily: font }} className="text-lg text-gray-700">{font}</span>
-                                        </button>
-                                    ))}
-                                </div>
+                            <div className="space-y-4">
+                                <h3 className="font-bold text-gray-700">Font Family</h3>
+                                <FontSelector />
 
-                                <h3 className="font-bold text-gray-700 mt-4">Text Color</h3>
+                                <h3 className="font-bold text-gray-700 mt-6">Text Size</h3>
+                                <input
+                                    type="range"
+                                    min="12"
+                                    max="120"
+                                    defaultValue="40"
+                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                    onChange={(e) => {
+                                        if (activeObject && 'fontSize' in activeObject) {
+                                            activeObject.set('fontSize', parseInt(e.target.value));
+                                            canvas?.requestRenderAll();
+                                        }
+                                    }}
+                                />
+
+                                <h3 className="font-bold text-gray-700">Text Color</h3>
 
                                 {/* Color Picker personalizado */}
                                 <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
