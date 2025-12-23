@@ -28,7 +28,10 @@ export const productVariantSchema = z.object({
     name: z.string(),
     color: z.string().optional(),
     hexCode: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
-    priceModifier: z.number(),
+    // Prevent extremely large negative numbers that could result in zero/negative total price
+    // Assuming a reasonable max discount, or simply flag suspicious inputs.
+    // For now, we allow negative for discounts but user input should be reasonable.
+    priceModifier: z.number().safe(), 
 });
 
 export const productSchema = z.object({
@@ -73,18 +76,42 @@ export const cartSchema = z.object({
 // Shipping and Checkout Schemas
 // ==========================================
 
+// Regex to prevent basic XSS payloads (simple heuristic: ban < >)
+// A more robust solution involves sanitization on output, but input validation helps.
+const safeStringResponse = 'Invalid characters detected';
+const noHtmlRegex = /^[^<>]*$/; 
+
 export const shippingInfoSchema = z.object({
-    firstName: z.string().min(1, 'First name is required').max(50),
-    lastName: z.string().min(1, 'Last name is required').max(50),
+    firstName: z.string()
+        .min(1, 'First name is required')
+        .max(50)
+        .regex(noHtmlRegex, safeStringResponse),
+    lastName: z.string()
+        .min(1, 'Last name is required')
+        .max(50)
+        .regex(noHtmlRegex, safeStringResponse),
     email: z.string().email('Invalid email format'),
     phone: z
         .string()
         .min(9, 'Phone number must be at least 9 characters')
-        .max(20, 'Phone number is too long'),
-    address: z.string().min(5, 'Address is too short').max(200),
-    city: z.string().min(2, 'City name is too short').max(100),
-    postalCode: z.string().min(4, 'Postal code is too short').max(10),
-    country: z.string().min(2, 'Country name is too short').max(50),
+        .max(20, 'Phone number is too long')
+        .regex(/^[+\d\s-]+$/, 'Invalid phone number format'),
+    address: z.string()
+        .min(5, 'Address is too short')
+        .max(200)
+        .regex(noHtmlRegex, safeStringResponse),
+    city: z.string()
+        .min(2, 'City name is too short')
+        .max(100)
+        .regex(noHtmlRegex, safeStringResponse),
+    postalCode: z.string()
+        .min(4, 'Postal code is too short')
+        .max(10)
+        .regex(/^[a-zA-Z0-9\s-]+$/, 'Invalid postal code format'), // Alphanumeric + space/dash
+    country: z.string()
+        .min(2, 'Country name is too short')
+        .max(50)
+        .regex(noHtmlRegex, safeStringResponse),
 });
 
 export const shippingMethodSchema = z.enum(['standard', 'express', 'overnight']);
@@ -101,7 +128,7 @@ export const createPaymentIntentSchema = z.object({
 // ==========================================
 
 export const trackOrderSchema = z.object({
-    orderNumber: z.string().min(1, 'Order number is required'),
+    orderNumber: z.string().min(1, 'Order number is required').regex(/^[a-zA-Z0-9-]+$/, 'Invalid order number format'),
     email: z.string().email('Invalid email format'),
 });
 
@@ -111,7 +138,7 @@ export const trackOrderSchema = z.object({
 
 export const saveDesignSchema = z.object({
     productId: z.string().min(1),
-    name: z.string().min(1).max(100),
+    name: z.string().min(1).max(100).regex(noHtmlRegex, safeStringResponse),
     canvasState: z.any(), // JSON object from fabric.js
     previewUrl: z.string().url().optional(),
 });

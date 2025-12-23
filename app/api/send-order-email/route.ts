@@ -56,9 +56,9 @@ function checkEmailRateLimit(ip: string): { allowed: boolean; resetTime?: number
 export async function POST(req: Request) {
     try {
         // Authentication required - only authenticated users can send order emails
-        const user = await requireAuth(req);
+        const user = await requireAuth(req, 'admin');
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ error: 'Forbidden: Admin Access Required' }, { status: 403 });
         }
 
         // Rate limiting

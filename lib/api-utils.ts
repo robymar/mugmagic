@@ -72,10 +72,21 @@ export async function validateRequest<T>(
  * const { data, error } = validateQueryParams(request, searchSchema);
  * if (error) return error;
  */
+/**
+ * Validates query parameters against a Zod schema.
+ * 
+ * @param request - The incoming Next.js request
+ * @param schema - Zod schema to validate against
+ * @returns Object with validated data or error response
+ * 
+ * @example
+ * const { data, error } = validateQueryParams(request, searchSchema);
+ * if (error) return error;
+ */
 export function validateQueryParams<T>(
     request: Request,
     schema: ZodSchema<T>
-): { data: T | null; error: Next Response | null } {
+): { data: T | null; error: NextResponse | null } {
     try {
         const { searchParams } = new URL(request.url);
         const params = Object.fromEntries(searchParams.entries());
@@ -167,17 +178,21 @@ export function isLocalhost(request: Request): boolean {
 }
 
 /**
- * Requires authentication for API routes.
- * Extracts user from Supabase session.
+ * Requires authentication for API routes and optionally enforces strict Role-Based Access Control (RBAC).
+ * Extracts user from Supabase session and verifies role against 'profiles' table if required.
  * 
  * @param request - The incoming request
- * @returns User object if authenticated, null otherwise
+ * @param requiredRole - (Optional) The specific role required (e.g. 'admin')
+ * @returns User object if authenticated and authorized, null otherwise
  * 
  * @example
+ * // Basic Auth
  * const user = await requireAuth(request);
- * if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+ * 
+ * // Admin Only
+ * const adminUser = await requireAuth(request, 'admin');
  */
-export async function requireAuth(request: Request): Promise<any | null> {
+export async function requireAuth(request: Request, requiredRole?: string): Promise<any | null> {
     try {
         const { createServerClient } = await import('@supabase/ssr');
         const { cookies } = await import('next/headers');
@@ -209,6 +224,20 @@ export async function requireAuth(request: Request): Promise<any | null> {
 
         if (error || !user) {
             return null;
+        }
+
+        // RBAC: Verify Role if required
+        if (requiredRole) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            if (!profile || profile.role !== requiredRole) {
+                console.warn(`Access deny for user ${user.id}. Required role: ${requiredRole}`);
+                return null;
+            }
         }
 
         return user;

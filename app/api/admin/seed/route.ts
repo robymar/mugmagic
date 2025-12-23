@@ -6,12 +6,12 @@ import { requireAuth } from '@/lib/api-utils';
 export async function POST(request: Request) {
     try {
         // CRITICAL: Only authenticated admin users should seed the database
-        const user = await requireAuth(request);
+        const user = await requireAuth(request, 'admin');
 
         if (!user) {
             return NextResponse.json(
-                { error: 'Unauthorized - Admin access required' },
-                { status: 401 }
+                { error: 'Forbidden - Admin role required' },
+                { status: 403 }
             );
         }
 

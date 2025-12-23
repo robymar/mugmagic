@@ -64,6 +64,23 @@ export async function POST(request: Request) {
         return errorResponse('Unauthorized', 401);
     }
 
+    // ---------------------------------------------------------
+    // SECURITY PATCH: RBAC (Role-Based Access Control)
+    // ---------------------------------------------------------
+    // Query the profiles table to verify if the user has admin privileges.
+    // This prevents privilege escalation attacks.
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    // Check if profile exists and has role 'admin'
+    // If profiles table is missing or user has no role, default to deny.
+    if (!profile || profile.role !== 'admin') {
+        return errorResponse('Forbidden: Insufficient privileges', 403);
+    }
+
     // Rate limiting
     const ip = getIP(request);
     const rateLimitCheck = checkProductCreationRateLimit(ip);

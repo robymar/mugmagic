@@ -117,13 +117,18 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                     .select('product_id, quantity')
                     .eq('order_id', orderId);
 
+                // ... (Inside payment_intent.succeeded)
+
+                // CRITICAL: Decrement Stock Atomically
+                // This prevents race conditions where two users buy the last item
+                let allStockUpdatesSuccessful = true;
+
                 if (itemsError) {
                     logError('Failed to retrieve order items for order', {
                         data: { error: itemsError.message, orderId: orderId }
                     });
+                    allStockUpdatesSuccessful = false; // Can't update stock if we can't find items
                 } else if (items && items.length > 0) {
-                    // CRITICAL: Decrement Stock Atomically
-                    // This prevents race conditions where two users buy the last item
                     for (const item of items) {
                         const { data: stockSuccess, error: stockError } = await supabaseAdmin
                             .rpc('decrement_stock', {
@@ -135,12 +140,12 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                             logError('Failed to decrement stock (RPC Error)', {
                                 data: { productId: item.product_id, error: stockError.message }
                             });
+                            allStockUpdatesSuccessful = false;
                         } else if (!stockSuccess) {
                             logError('Failed to decrement stock (Insufficient Stock)', {
                                 data: { productId: item.product_id, requested: item.quantity }
                             });
-                            // Note: In a real app, you might flag this order for manual review
-                            // or trigger a refund if stock is critical.
+                            allStockUpdatesSuccessful = false;
                         } else {
                             logInfo('Stock decremented successfully', {
                                 data: { productId: item.product_id, quantity: item.quantity }
@@ -151,58 +156,42 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                     logWarn('No order items found for order', {
                         data: { orderId: orderId }
                     });
+                    // If no items, technically stock update didn't fail, but it's weird. 
+                    // We'll allow it to proceed to PAID if that's the business logic (e.g. donations), 
+                    // but for a shop, this might be an error. Assuming true for now.
                 }
-            }
+                // } -> End of else block for getting items
 
-            // Update order status to 'paid'
-            const { error } = await supabaseAdmin
-                .from('orders')
-                .update({
-                    payment_status: 'paid',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('payment_intent_id', paymentIntent.id);
+                // Determine final status based on stock success
+                const finalStatus = allStockUpdatesSuccessful ? 'paid' : 'stock_error';
 
-            if (error) {
-                logError('Failed to update order status to paid', {
-                    data: { error: error.message, paymentIntentId: paymentIntent.id }
-                });
-            } else {
-                logInfo('✅ Order marked as PAID in database', {
-                    data: { paymentIntentId: paymentIntent.id }
-                });
-
-                // ---------------------------------------------------------
-                // CRITICAL: Atomic Stock Deduction
-                // ---------------------------------------------------------
-                const { data: orderItems, error: itemsError } = await supabaseAdmin
-                    .from('order_items')
-                    .select('product_id, quantity')
-                    .eq('order_id', paymentIntent.id);
-
-                if (orderItems) {
-                    for (const item of orderItems) {
-                        const { data: success, error: stockError } = await supabaseAdmin
-                            .rpc('decrement_stock', {
-                                row_id: item.product_id,
-                                quantity_to_subtract: item.quantity
-                            });
-
-                        if (stockError || !success) {
-                            logError('⚠️ Failed to decrement stock', {
-                                data: {
-                                    productId: item.product_id,
-                                    error: stockError?.message || 'Insufficient stock'
-                                }
-                            });
-                        }
-                    }
-                    logInfo('📦 Stock inventory updated');
+                if (!allStockUpdatesSuccessful) {
+                    logError('CRITICAL: Order paid but stock update failed. Manual review required.', {
+                        data: { paymentIntentId: paymentIntent.id, orderId: orderId }
+                    });
                 }
-            }
 
-            break;
-        }
+                // Update order status
+                const { error } = await supabaseAdmin
+                    .from('orders')
+                    .update({
+                        payment_status: finalStatus,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('payment_intent_id', paymentIntent.id);
+
+                if (error) {
+                    logError(`Failed to update order status to ${finalStatus}`, {
+                        data: { error: error.message, paymentIntentId: paymentIntent.id }
+                    });
+                } else {
+                    logInfo(`✅ Order updated to status: ${finalStatus}`, {
+                        data: { paymentIntentId: paymentIntent.id }
+                    });
+                }
+
+                break;
+            }
 
         // Payment failed
         case 'payment_intent.payment_failed': {
