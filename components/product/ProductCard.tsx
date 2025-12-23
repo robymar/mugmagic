@@ -52,7 +52,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center p-6">
                     <Image
-                        src={product.images.thumbnail}
+                        src={product.images?.thumbnail || 'https://placehold.co/400x400/ececec/333333?text=No+Image'}
                         alt={product.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-500"

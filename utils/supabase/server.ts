@@ -14,26 +14,13 @@ export async function createClient() {
                 },
                 setAll(cookiesToSet) {
                     try {
-                        cookiesToSet.forEach(({ name, value, options }) => {
-                            const newOptions = {
-                                ...options,
-                                sameSite: 'lax',
-                                path: '/',
-                                // Consistent secure logic: production only
-                                secure: process.env.NODE_ENV === 'production',
-                            };
-                            // IMPORTANT: Delete 'domain' to ensure it's a Host-Only cookie
-                            // This fixes issues where Supabase might send a domain that conflicts with localhost
-                            delete newOptions.domain;
-
-                            // console.log(`🍪 Server Client setting cookie: ${name}`, newOptions);
-                            cookieStore.set(name, value, newOptions);
-                        });
-                    } catch (err) {
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            cookieStore.set(name, value, options)
+                        )
+                    } catch {
                         // The `setAll` method was called from a Server Component.
                         // This can be ignored if you have middleware refreshing
                         // user sessions.
-                        // console.warn('⚠️ Server Client setAll failed (expected in Server Components):', err);
                     }
                 },
             },

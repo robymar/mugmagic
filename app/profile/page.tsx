@@ -19,47 +19,8 @@ export default async function ProfilePage() {
     // Validar sesión
     const { data: { user }, error } = await supabase.auth.getUser();
 
-    // Debug user session
     if (!user) {
-        // Log removed
-    } else {
-        // Log removed
-    }
-
-    if (!user) {
-
-
-        // Instead of redirecting, show debug info
-        return (
-            <div className="p-8 text-center text-red-600 max-w-2xl mx-auto">
-                <h1 className="text-2xl font-bold mb-4">Debug: No Session Found on Server</h1>
-                <p className="mb-4">The content cannot be loaded because Supabase cannot find the user session.</p>
-
-                <div className="mt-4 p-4 bg-gray-100 rounded text-left overflow-auto text-xs font-mono space-y-2">
-                    <p><strong>Cookies received:</strong> {cookieStore.getAll().map(c => c.name).join(', ')}</p>
-                    {error && <p className="text-red-600"><strong>Error:</strong> {error.message}</p>}
-
-                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                        <p className="font-bold mb-2">🔧 Next Steps:</p>
-                        <ol className="list-decimal pl-5 space-y-1">
-                            <li>Open browser DevTools (F12) → Application → Cookies</li>
-                            <li>Check if you have cookies starting with "sb-"</li>
-                            <li>If yes, try clearing ALL cookies and signing in again</li>
-                            <li>If no, the server action didn't set cookies properly</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <div className="mt-6 space-x-4">
-                    <Link href="/login" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">
-                        Go to Login
-                    </Link>
-                    <Link href="/auth-debug" className="inline-block bg-gray-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-700">
-                        Debug Tools
-                    </Link>
-                </div>
-            </div>
-        );
+        redirect('/login');
     }
 
     // User is authenticated - show profile

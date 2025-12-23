@@ -1,85 +1,132 @@
 // @ts-nocheck
 "use client";
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
-// Import only what we need from THREE to reduce bundle size
-import { Mesh, MeshStandardMaterial, Texture, DoubleSide, BackSide } from 'three';
+import { OrbitControls, Environment, ContactShadows, Center } from '@react-three/drei';
+import * as THREE from 'three';
 import { useDesignStore } from '@/stores/designStore';
 import { useCanvasTexture } from './useCanvasTexture';
 
-const MugMesh = ({ texture, mugColor }: { texture: Texture | null; mugColor: string }) => {
-    const meshRef = useRef<Mesh>(null);
-    const materialRef = useRef<MeshStandardMaterial>(null);
+const RealisticMugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null; mugColor: string }) => {
+    const meshRef = useRef<THREE.Mesh>(null);
+    const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
 
-    // Force material update when texture changes
+    // Geometry for the Mug Body (Lathe)
+    const mugGeometry = useMemo(() => {
+        const points = [];
+        // Profile of a standard ceramic mug
+        // Inside bottom
+        points.push(new THREE.Vector2(0, 0.1));
+        points.push(new THREE.Vector2(0.9, 0.1));
+        // Inside wall
+        points.push(new THREE.Vector2(0.9, 2.4));
+        // Lip (rounded top)
+        points.push(new THREE.Vector2(0.95, 2.5));
+        points.push(new THREE.Vector2(1.0, 2.4));
+        // Outside wall
+        points.push(new THREE.Vector2(1.0, 0.1));
+        // Outside bottom fillet
+        points.push(new THREE.Vector2(0.9, 0.0));
+        points.push(new THREE.Vector2(0.0, 0.0));
+
+        // Generate geometry
+        const geometry = new THREE.LatheGeometry(points, 64);
+
+        // Calculate UVs manually to wrap the texture around the outer wall correctly
+        const posAttribute = geometry.attributes.position;
+        const uvAttribute = geometry.attributes.uv;
+
+        for (let i = 0; i < posAttribute.count; i++) {
+            const x = posAttribute.getX(i);
+            const z = posAttribute.getZ(i);
+            const y = posAttribute.getY(i);
+
+            // Polar coordinates for wrapping
+            const angle = Math.atan2(z, x); // -PI to PI
+            let u = (angle / (2 * Math.PI)) + 0.5; // 0 to 1
+
+            // Adjust U to center the design on the "front" (usually -Z or +Z depending on rotation)
+            // Flipping/offsetting as needed. 
+            u = (u + 0.25) % 1;
+
+            // Simple V based on height (roughly 0 to 2.5)
+            // We want the printable area (middle ~2 units) to map to 0-1
+            // Approx mapping: y=0.2 -> v=0, y=2.3 -> v=1
+            const v = (y - 0.2) / 2.1;
+
+            // Only apply this mapping to outer wall points (radius approx 1.0)
+            const radius = Math.sqrt(x * x + z * z);
+            if (radius > 0.95 && y > 0.05 && y < 2.45) {
+                uvAttribute.setXY(i, u, v);
+            } else {
+                // Map other parts to a whitespace area of texture or just keep standard
+                // ideally 0,0 if texture is transparent or white
+                uvAttribute.setXY(i, 0, 0);
+            }
+        }
+
+        geometry.computeVertexNormals();
+        return geometry;
+    }, []);
+
+    // Geometry for Handle (Tube)
+    const handleGeometry = useMemo(() => {
+        const curve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0.95, 2.0, 0),
+            new THREE.Vector3(1.6, 2.1, 0),
+            new THREE.Vector3(1.8, 1.25, 0),
+            new THREE.Vector3(1.6, 0.4, 0),
+            new THREE.Vector3(0.95, 0.5, 0)
+        ]);
+        return new THREE.TubeGeometry(curve, 32, 0.15, 16, false);
+    }, []);
+
+    // Update material texture
     useEffect(() => {
         if (materialRef.current && texture) {
-            console.log('[MugMesh] Updating material with new texture');
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping; // Don't repeat vertically
+
+            // Texture placement adjustments
+            texture.repeat.set(1, 1);
+            // Invert U if needed or shift
+            texture.center.set(0.5, 0.5);
+            texture.rotation = 0;
+
             materialRef.current.map = texture;
             materialRef.current.needsUpdate = true;
         }
     }, [texture]);
 
-    // Update material color when mugColor changes
+    // Update color
     useEffect(() => {
         if (materialRef.current) {
-            console.log('[MugMesh] Updating mug color to:', mugColor);
             materialRef.current.color.set(mugColor);
-            materialRef.current.needsUpdate = true;
         }
     }, [mugColor]);
 
-    useFrame((state, delta) => {
-        // Optional: slight idle rotation
-        // if (meshRef.current) meshRef.current.rotation.y += delta * 0.1;
-    });
-
     return (
-        <group position={[0, -0.5, 0]}>
-            {/* Mug Body - open cylinder (no caps) with rotation to match 2D canvas */}
-            <mesh ref={meshRef} position={[0, 0, 0]} rotation={[0, Math.PI, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[1, 1, 2.5, 64, 1, true]} />
-                <meshStandardMaterial
+        <group position={[0, -1.25, 0]}> {/* Center vertically */}
+            <mesh geometry={mugGeometry} receiveShadow castShadow>
+                <meshPhysicalMaterial
                     ref={materialRef}
-                    map={texture}
-                    color={mugColor}  // Color base de la taza
-                    side={DoubleSide}
-                    roughness={0.2}
+                    color={mugColor}
+                    roughness={0.15}
                     metalness={0.1}
+                    clearcoat={0.5}
+                    clearcoatRoughness={0.1}
+                    side={THREE.DoubleSide}
                 />
             </mesh>
-
-            {/* Interior of mug - inner cylinder to show hollow */}
-            <mesh position={[0, 0.1, 0]} rotation={[0, 0, 0]}>
-                <cylinderGeometry args={[0.92, 0.92, 2.3, 64, 1, true]} />
-                <meshStandardMaterial
-                    color="#ffffff"  // Interior siempre blanco
-                    side={BackSide}
-                    roughness={0.3}
-                    metalness={0.05}
+            <mesh geometry={handleGeometry} receiveShadow castShadow>
+                <meshPhysicalMaterial
+                    color={mugColor}
+                    roughness={0.15}
+                    metalness={0.1}
+                    clearcoat={0.5}
+                    clearcoatRoughness={0.1}
                 />
-            </mesh>
-
-            {/* White caps for top and bottom */}
-            <mesh position={[0, 1.25, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
-                <circleGeometry args={[1, 64]} />
-                <meshStandardMaterial color={mugColor} roughness={0.2} metalness={0.1} />
-            </mesh>
-            <mesh position={[0, -1.25, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-                <circleGeometry args={[1, 64]} />
-                <meshStandardMaterial color={mugColor} roughness={0.2} metalness={0.1} />
-            </mesh>
-
-            {/* Mug Handle */}
-            <mesh position={[1.2, 0, 0]} rotation={[0, 0, 0]} castShadow receiveShadow>
-                <torusGeometry args={[0.6, 0.15, 16, 32, Math.PI]} />
-                <meshStandardMaterial color={mugColor} />
-            </mesh>
-            <mesh position={[1.2, 0, 0]} rotation={[0, 0, Math.PI]} castShadow receiveShadow>
-                <torusGeometry args={[0.6, 0.15, 16, 32, Math.PI]} />
-                <meshStandardMaterial color={mugColor} />
             </mesh>
         </group>
     );
@@ -89,57 +136,52 @@ export default function ProductViewer3D() {
     const { canvas, mugColor } = useDesignStore();
     const texture = useCanvasTexture(canvas);
 
-    // Debug logging
-    React.useEffect(() => {
-        console.log('[ProductViewer3D] Canvas from store:', canvas);
-        console.log('[ProductViewer3D] Canvas dimensions:', canvas?.width, 'x', canvas?.height);
-        console.log('[ProductViewer3D] Canvas has objects:', canvas?.getObjects().length || 0);
-    }, [canvas]);
-
-    React.useEffect(() => {
-        console.log('[ProductViewer3D] Texture updated:', texture);
-        console.log('[ProductViewer3D] Texture is null?', texture === null);
-        if (texture) {
-            console.log('[ProductViewer3D] Texture image dimensions:', texture.image?.width, 'x', texture.image?.height);
-        }
-    }, [texture]);
-
     return (
-        <div className="w-full h-full relative bg-gray-200 rounded-xl overflow-hidden">
-            <Canvas shadows camera={{ position: [5, 3, 8], fov: 45 }}>
-                <fog attach="fog" args={['#f0f0f3', 5, 20]} />
-                <color attach="background" args={['#f0f0f3']} />
-
-                {/* Manual lighting instead of Stage to prevent auto-zoom */}
+        <div className="w-full h-full relative bg-gray-100 rounded-xl overflow-hidden shadow-inner">
+            <Canvas shadows camera={{ position: [4, 2, 5], fov: 35 }}>
+                {/* Environment & Lighting */}
+                <Environment preset="studio" />
                 <ambientLight intensity={0.5} />
-                <directionalLight position={[10, 10, 5]} intensity={0.8} castShadow />
-                <directionalLight position={[-10, 5, -5]} intensity={0.3} />
+                <spotLight
+                    position={[10, 10, 5]}
+                    angle={0.15}
+                    penumbra={1}
+                    intensity={1}
+                    castShadow
+                    shadow-bias={-0.0001}
+                />
 
-                <MugMesh texture={texture} mugColor={mugColor} />
+                <Center>
+                    <RealisticMugMesh texture={texture} mugColor={mugColor} />
+                </Center>
+
+                <ContactShadows
+                    position={[0, -1.26, 0]}
+                    opacity={0.4}
+                    scale={10}
+                    blur={2}
+                    far={4}
+                />
 
                 <OrbitControls
                     minPolarAngle={0}
                     maxPolarAngle={Math.PI / 1.5}
-                    enablePan={false}
                     minDistance={3}
-                    maxDistance={12}
-                    enableDamping={true}
-                    dampingFactor={0.05}
+                    maxDistance={10}
+                    enablePan={false}
+                    enableDamping
                 />
             </Canvas>
 
-            {/* Loading Indicator */}
+            {/* Loading Overlay */}
             {!texture && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 backdrop-blur-sm pointer-events-none">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                        <p className="text-sm font-medium text-gray-600">Applying design to 3D...</p>
-                    </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10 pointer-events-none">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
             )}
 
-            <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-lg text-xs font-medium text-gray-600 pointer-events-none">
-                Drag to Rotate 3D
+            <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-xs px-3 py-1.5 rounded-full text-xs font-semibold text-gray-500 pointer-events-none shadow-sm border border-white/50">
+                Interactive 3D Preview
             </div>
         </div>
     );

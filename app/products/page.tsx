@@ -4,7 +4,7 @@ import { Sparkles, Award, TrendingUp, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function ProductsPage() {
-    const allProducts = await getProductsFromDB();
+    const { products: allProducts } = await getProductsFromDB();
     const featuredProducts = allProducts.filter(p => p.featured);
     const bestsellers = allProducts.filter(p => p.bestseller);
 
