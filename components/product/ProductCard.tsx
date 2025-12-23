@@ -7,6 +7,7 @@ import { Product } from '@/types/product';
 import { Star, ShoppingCart, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import WishlistButton from './WishlistButton';
+import { formatCurrency } from '@/lib/format';
 
 interface ProductCardProps {
     product: Product;
@@ -138,11 +139,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
                     <div>
                         <div className="flex items-baseline gap-2">
                             <span className="text-2xl font-black text-gray-900">
-                                €{product.basePrice.toFixed(2)}
+                                {formatCurrency(product.basePrice)}
                             </span>
+
                             {product.compareAtPrice && (
                                 <span className="text-sm text-gray-400 line-through">
-                                    €{product.compareAtPrice.toFixed(2)}
+                                    {formatCurrency(product.compareAtPrice)}
                                 </span>
                             )}
                         </div>

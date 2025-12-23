@@ -90,8 +90,17 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                         <div className="divide-y divide-gray-100">
                             {items?.map((item) => (
                                 <div key={item.id} className="p-6 flex gap-4">
-                                    <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
-                                        <Package size={32} />
+                                    <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 overflow-hidden relative">
+                                        {item.customization_data?.designSnapshot ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={item.customization_data.designSnapshot}
+                                                alt="Design Preview"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <Package size={32} />
+                                        )}
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="font-bold text-gray-900">{item.product_name}</h3>

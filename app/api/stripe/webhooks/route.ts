@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { stripe } from '@/lib/stripe';
+
 import { logInfo, logError, logWarn } from '@/lib/logger';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2024-04-10',
+});
 
 /**
  * Stripe Webhook Handler
@@ -189,9 +193,10 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                         data: { paymentIntentId: paymentIntent.id }
                     });
                 }
-
-                break;
             }
+
+            break;
+        }
 
         // Payment failed
         case 'payment_intent.payment_failed': {

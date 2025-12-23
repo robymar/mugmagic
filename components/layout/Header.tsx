@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { ShoppingCart, Menu, X, Search, User, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/stores/cartStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 export const Header = () => {
     const pathname = usePathname();

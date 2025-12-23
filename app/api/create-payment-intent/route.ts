@@ -4,11 +4,11 @@ import { PRODUCTS } from '@/data/products';
 import { CartItem } from '@/stores/cartStore';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
-import { createPaymentIntentSchema } from '@/lib/validation-schemas';
+import { createPaymentIntentSchema, CartItemInput } from '@/lib/validation-schemas';
 
 // Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2023-10-16', // Use a pinned version or latest
+    apiVersion: '2024-04-10', // Use a pinned version or latest
 });
 
 // Rate limiting for checkout (prevent card testing/inventory attacks)
@@ -39,7 +39,7 @@ function checkCheckoutRateLimit(ip: string): { allowed: boolean; resetTime?: num
     return { allowed: true };
 }
 
-const calculateOrderAmount = (items: CartItem[], shippingMethodId: string) => {
+const calculateOrderAmount = (items: CartItemInput[], shippingMethodId: string) => {
     // 1. Calculate Subtotal from trusted product data
     const subtotal = items.reduce((sum, item) => {
         const product = PRODUCTS.find((p) => p.id === item.productId);
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         const { data, error: validationError } = await validateRequest(req, createPaymentIntentSchema);
         if (validationError) return validationError;
 
-        const { items, shippingInfo, shippingMethod, userId } = data;
+        const { items, shippingInfo, shippingMethod, userId } = data!;
 
         if (!items || items.length === 0) {
             return errorResponse('No items in cart', 400);

@@ -5,13 +5,14 @@ import { ProductGallery } from '@/components/product/ProductGallery';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductVariantSelectorClient } from '@/components/product/ProductVariantSelectorClient';
+import { formatCurrency } from '@/lib/format';
 import {
     Star, ShoppingCart, Sparkles, Package, Shield, Truck,
     Check, Heart, Share2, ChevronRight
 } from 'lucide-react';
 
 export async function generateStaticParams() {
-    const products = await getProductsFromDB();
+    const { products } = await getProductsFromDB();
     return products.map((product) => ({
         slug: product.slug,
     }));
@@ -30,7 +31,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     const finalPrice = product.basePrice + (defaultVariant?.priceModifier || 0);
 
     // Get related products (same category, excluding current)
-    const allProducts = await getProductsFromDB();
+    const { products: allProducts } = await getProductsFromDB();
     const relatedProducts = allProducts
         .filter(p => p.category === product.category && p.id !== product.id)
         .slice(0, 3);
@@ -112,12 +113,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                         {/* Price */}
                         <div className="flex items-baseline gap-4">
                             <div className="text-4xl font-black text-gray-900">
-                                €{product.basePrice.toFixed(2)}
+                                {formatCurrency(product.basePrice)}
                             </div>
                             {product.compareAtPrice && (
                                 <>
                                     <div className="text-2xl text-gray-400 line-through">
-                                        €{product.compareAtPrice.toFixed(2)}
+                                        {formatCurrency(product.compareAtPrice)}
                                     </div>
                                     <div className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">
                                         Save {Math.round(((product.compareAtPrice - product.basePrice) / product.compareAtPrice) * 100)}%

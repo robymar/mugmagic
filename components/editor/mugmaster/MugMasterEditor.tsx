@@ -106,6 +106,10 @@ export default function MugMasterEditor({ productId, initialDesign, designId }: 
             price: product.basePrice, // Use actual product price
             previewUrl: previewUrl,
             designId: uuidv4(), // Mark as custom design
+            customizationData: {
+                designSnapshot: previewUrl,
+                canvasJson: JSON.stringify(canvas.toJSON())
+            }
         });
 
         toggleCart();
