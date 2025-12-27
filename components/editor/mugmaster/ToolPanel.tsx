@@ -1,12 +1,66 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActiveTab } from './MugMasterEditor';
 import { AvatarBuilder } from './AvatarBuilder';
 import { FontSelector } from './FontSelector';
 import { useDesignStore } from '@/stores/designStore';
 import { Type, Image as ImageIcon, Plus } from 'lucide-react';
+
+// Stickers Panel Component
+interface StickersPanelProps {
+    addImage: (url: string) => void;
+}
+
+const StickersPanel: React.FC<StickersPanelProps> = ({ addImage }) => {
+    const [stickers, setStickers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStickers = async () => {
+            try {
+                const res = await fetch('/api/stickers');
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setStickers(data);
+                }
+            } catch (error) {
+                console.error('Error fetching stickers:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStickers();
+    }, []);
+
+    if (loading) {
+        return <div className="text-center py-8 text-gray-500">Loading stickers...</div>;
+    }
+
+    if (stickers.length === 0) {
+        return <div className="text-center py-8 text-gray-500">No stickers available</div>;
+    }
+
+    return (
+        <div className="grid grid-cols-3 gap-4">
+            {stickers.map(sticker => (
+                <button
+                    key={sticker.id}
+                    onClick={() => addImage(sticker.image_url)}
+                    className="aspect-square bg-gray-50 rounded-2xl p-2 hover:bg-white hover:shadow-lg transition-all border border-gray-100 flex items-center justify-center"
+                >
+                    <img
+                        src={sticker.image_url}
+                        alt={sticker.name}
+                        className="w-full h-full object-contain pointer-events-none"
+                        onError={(e) => (e.currentTarget.src = 'https://cdn-icons-png.flaticon.com/512/1665/1665731.png')}
+                    />
+                </button>
+            ))}
+        </div>
+    );
+};
 
 interface ToolPanelProps {
     activeTab: ActiveTab;
@@ -136,22 +190,7 @@ export const ToolPanel = ({ activeTab }: ToolPanelProps) => {
 
                     {/* --- STICKERS --- */}
                     {activeTab === 'stickers' && (
-                        <div className="grid grid-cols-3 gap-4">
-                            {/* In real app these would be real sticker URLs */}
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <button
-                                    key={i}
-                                    onClick={() => addImage(`https://cdn-icons-png.flaticon.com/512/4710/47109${i + 15}.png`)}
-                                    className="aspect-square bg-gray-50 rounded-2xl p-2 hover:bg-white hover:shadow-lg transition-all border border-gray-100 flex items-center justify-center"
-                                >
-                                    <img
-                                        src={`https://cdn-icons-png.flaticon.com/512/4710/47109${i + 15}.png`}
-                                        className="w-full h-full object-contain pointer-events-none"
-                                        onError={(e) => (e.currentTarget.src = 'https://cdn-icons-png.flaticon.com/512/1665/1665731.png')}
-                                    />
-                                </button>
-                            ))}
-                        </div>
+                        <StickersPanel addImage={addImage} />
                     )}
 
                     {/* --- UPLOAD --- */}

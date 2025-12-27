@@ -1,37 +1,46 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { useDesignStore } from '@/stores/designStore';
 
-// MOCK DATA
-const BASES = [
-    { id: 'base1', src: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix' },
-    { id: 'base2', src: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka' },
-    { id: 'base3', src: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bob' },
-];
-
-const HAIRSTYLES = [
-    { id: 'hair1', name: 'Short', seed: 'hair1' },
-    { id: 'hair2', name: 'Long', seed: 'hair2' },
-    { id: 'hair3', name: 'Curly', seed: 'hair3' },
-];
-
-const GLASSES = [
-    { id: 'none', name: 'No Glasses' },
-    { id: 'round', name: 'Round' },
-    { id: 'square', name: 'Square' },
-];
-
 export const AvatarBuilder = () => {
+    const [avatars, setAvatars] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [selectedBase, setSelectedBase] = useState(0);
     const { addImage } = useDesignStore();
 
+    useEffect(() => {
+        const fetchAvatars = async () => {
+            try {
+                const res = await fetch('/api/avatars');
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    setAvatars(data);
+                }
+            } catch (error) {
+                console.error('Error fetching avatars:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAvatars();
+    }, []);
+
     const handleAddToMug = () => {
-        const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedBase}`;
-        addImage(avatarUrl);
+        if (avatars.length > 0 && avatars[selectedBase]) {
+            addImage(avatars[selectedBase].image_url);
+        }
     };
+
+    if (loading) {
+        return <div className="text-center py-8 text-gray-500">Loading avatars...</div>;
+    }
+
+    if (avatars.length === 0) {
+        return <div className="text-center py-8 text-gray-500">No avatars available</div>;
+    }
 
     return (
         <div className="flex flex-col gap-8 h-full">
@@ -44,7 +53,7 @@ export const AvatarBuilder = () => {
             <div className="flex justify-center py-4">
                 <div className="w-40 h-40 bg-blue-50 rounded-full border-4 border-white shadow-xl overflow-hidden relative">
                     <img
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedBase}`}
+                        src={avatars[selectedBase]?.image_url || ''}
                         alt="Avatar Preview"
                         className="w-full h-full object-cover"
                     />
@@ -58,9 +67,9 @@ export const AvatarBuilder = () => {
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Body Type</label>
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
-                        {Array.from({ length: 8 }).map((_, i) => (
+                        {avatars.map((avatar, i) => (
                             <button
-                                key={i}
+                                key={avatar.id}
                                 onClick={() => setSelectedBase(i)}
                                 className={`
                                     flex-shrink-0 w-16 h-16 rounded-2xl border-2 overflow-hidden snap-center
@@ -68,7 +77,7 @@ export const AvatarBuilder = () => {
                                     bg-white transition-all
                                 `}
                             >
-                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}&backgroundColor=transparent`} className="w-full h-full" />
+                                <img src={avatar.image_url} alt={avatar.name} className="w-full h-full" />
                             </button>
                         ))}
                     </div>

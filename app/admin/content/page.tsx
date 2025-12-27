@@ -55,9 +55,17 @@ export default function ContentPage() {
             const endpoint = activeTab === 'stickers' ? '/api/stickers' : '/api/avatars';
             const res = await fetch(endpoint);
             const data = await res.json();
-            setItems(data);
+
+            // Ensure data is an array before setting state
+            if (Array.isArray(data)) {
+                setItems(data);
+            } else {
+                console.error('API returned non-array data:', data);
+                setItems([]);
+            }
         } catch (error) {
             console.error('Error fetching items:', error);
+            setItems([]);
         } finally {
             setLoading(false);
         }
@@ -146,8 +154,8 @@ export default function ContentPage() {
                 <button
                     onClick={() => setActiveTab('stickers')}
                     className={`px-6 py-3 font-bold border-b-2 transition-colors ${activeTab === 'stickers'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     🎨 Stickers
@@ -155,8 +163,8 @@ export default function ContentPage() {
                 <button
                     onClick={() => setActiveTab('avatars')}
                     className={`px-6 py-3 font-bold border-b-2 transition-colors ${activeTab === 'avatars'
-                            ? 'border-purple-600 text-purple-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-purple-600 text-purple-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     👤 Avatars

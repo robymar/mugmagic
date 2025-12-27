@@ -11,15 +11,17 @@ export async function GET() {
             .eq('active', true)
             .order('display_order', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error fetching avatars:', error);
+            // Return empty array instead of error object to maintain consistent response type
+            return NextResponse.json([]);
+        }
 
-        return NextResponse.json(avatars);
+        return NextResponse.json(avatars || []);
     } catch (error) {
         console.error('Error fetching avatars:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch avatars' },
-            { status: 500 }
-        );
+        // Return empty array on exception
+        return NextResponse.json([]);
     }
 }
 
