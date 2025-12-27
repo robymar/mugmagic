@@ -25,6 +25,7 @@ interface CartState {
 
     // Actions
     addItem: (item: CartItem) => void;
+    updateItem: (id: string, updates: Partial<CartItem>) => void;
     removeItem: (id: string) => void;
     updateQuantity: (id: string, quantity: number) => void;
     clearCart: () => void;
@@ -79,6 +80,14 @@ export const useCartStore = create<CartState>()(
                     // New item or customized item (each design is unique)
                     set({ items: [...items, item], isOpen: true });
                 }
+            },
+
+            updateItem: (id, updates) => {
+                set({
+                    items: get().items.map((i) =>
+                        i.id === id ? { ...i, ...updates } : i
+                    ),
+                });
             },
 
             removeItem: (id) => {

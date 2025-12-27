@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { Product } from '@/types/product';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // Convert DB row to Product type
 function mapRowToProduct(row: any): Product {
@@ -25,8 +26,8 @@ function mapRowToProduct(row: any): Product {
     };
 }
 
-export async function getProductsFromDB(page: number = 1, limit: number = 50) {
-    const supabase = await createClient();
+export async function getProductsFromDB(page: number = 1, limit: number = 50, customClient?: SupabaseClient) {
+    const supabase = customClient ?? await createClient();
 
     // Calculate range
     const from = (page - 1) * limit;
@@ -71,38 +72,48 @@ export async function getProductBySlugFromDB(slug: string) {
 export async function createProductInDB(product: Product) {
     const supabase = await createClient();
 
-    const dbRow = {
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        long_description: product.longDescription,
-        category: product.category,
-        base_price: product.basePrice,
-        compare_at_price: product.compareAtPrice,
-        images: product.images,
-        specifications: product.specifications,
-        variants: product.variants,
-        tags: product.tags,
-        in_stock: product.inStock,
-        featured: product.featured,
-        bestseller: product.bestseller,
-        new: product.new,
-        rating: product.rating,
-        review_count: product.reviewCount
-    };
+    try {
+        const dbRow = {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            description: product.description,
+            long_description: product.longDescription,
+            category: product.category,
+            base_price: product.basePrice,
+            compare_at_price: product.compareAtPrice,
+            images: product.images,
+            specifications: product.specifications,
+            variants: product.variants,
+            tags: product.tags,
+            in_stock: product.inStock,
+            featured: product.featured,
+            bestseller: product.bestseller,
+            new: product.new,
+            rating: product.rating,
+            review_count: product.reviewCount
+        };
 
-    const { error } = await supabase
-        .from('products')
-        .upsert(dbRow)
-        .select()
-        .single();
+        console.log('Attempting to insert product:', JSON.stringify(dbRow, null, 2));
 
-    if (error) {
-        console.error('Error creating product:', error);
-        throw error;
+        const { error, data } = await supabase
+            .from('products')
+            .upsert(dbRow)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating product:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            throw error;
+        }
+
+        console.log('Product created successfully:', data);
+    } catch (err: any) {
+        console.error('Error in createProductInDB:', err);
+        console.error('Error stack:', err.stack);
+        throw new Error(`Database error: ${err.message || String(err)}`);
     }
-
 }
 
 export async function updateProductInDB(id: string, product: Partial<Product>) {

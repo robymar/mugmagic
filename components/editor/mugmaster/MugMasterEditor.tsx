@@ -17,8 +17,11 @@ import { PRODUCTS } from '@/data/products';
 
 export type ActiveTab = 'color' | 'text' | 'stickers' | 'avatar' | 'upload' | null;
 
+import { Product } from '@/types/product';
+
 interface MugMasterEditorProps {
     productId: string;
+    product: Product;
     initialDesign?: {
         text?: string;
         textColor?: string;
@@ -26,18 +29,36 @@ interface MugMasterEditorProps {
         image?: string;
     };
     designId?: string;
+    cartItemId?: string;
 }
 
-export default function MugMasterEditor({ productId, initialDesign, designId }: MugMasterEditorProps) {
+export default function MugMasterEditor({ productId, product, initialDesign, designId, cartItemId }: MugMasterEditorProps) {
     const [activeTab, setActiveTab] = useState<ActiveTab>('text');
-    const { addItem, toggleCart } = useCartStore();
+    const { items: cartItems, addItem, toggleCart } = useCartStore();
     const { canvas, saveDesign, addText, addImage, loadDesign } = useDesignStore();
 
-    // Load initial design template OR saved design
+    // Load initial design template OR saved design OR cart item design
     React.useEffect(() => {
         if (!canvas) return;
 
-        // 1. Load Saved Design if ID exists
+        // 1. Load from Cart Item if editing from cart
+        if (cartItemId) {
+            const cartItem = cartItems.find(item => item.id === cartItemId);
+            if (cartItem?.customizationData?.canvasJson) {
+                try {
+                    const canvasData = JSON.parse(cartItem.customizationData.canvasJson);
+                    canvas.loadFromJSON(canvasData, () => {
+                        canvas.requestRenderAll();
+                    });
+                } catch (error) {
+                    console.error('Error loading cart design:', error);
+                    toast.error('Failed to load design');
+                }
+            }
+            return;
+        }
+
+        // 2. Load Saved Design if ID exists
         if (designId) {
             const load = async () => {
                 const toastId = toast.loading('Loading your design...');
@@ -53,7 +74,7 @@ export default function MugMasterEditor({ productId, initialDesign, designId }: 
             return; // Skip template loading if loading a saved design
         }
 
-        // 2. Load Template if exists
+        // 3. Load Template if exists
         if (initialDesign) {
             // ... existing template logic
             if (initialDesign.text) {
@@ -71,7 +92,7 @@ export default function MugMasterEditor({ productId, initialDesign, designId }: 
                 }, 600);
             }
         }
-    }, [canvas, initialDesign, designId, addText, addImage, loadDesign]);
+    }, [canvas, initialDesign, designId, cartItemId, cartItems, addText, addImage, loadDesign]);
 
     const handleAddToCart = () => {
         // Confetti Effect
@@ -87,35 +108,47 @@ export default function MugMasterEditor({ productId, initialDesign, designId }: 
             return;
         }
 
-        // Find the product by productId
-        const product = PRODUCTS.find(p => p.slug === productId);
-
         if (!product) {
             toast.error('Product not found', { icon: '❌' });
             return;
         }
 
-        // Simulate add to cart - in real app we'd export the image here
         const previewUrl = canvas?.toDataURL({ format: 'png', multiplier: 0.5 });
+        const customizationData = {
+            designSnapshot: previewUrl,
+            canvasJson: JSON.stringify(canvas.toJSON())
+        };
 
-        addItem({
-            id: uuidv4(),
-            productId,
-            product: product, // Include the full product object
-            quantity: 1,
-            price: product.basePrice, // Use actual product price
-            previewUrl: previewUrl,
-            designId: uuidv4(), // Mark as custom design
-            customizationData: {
-                designSnapshot: previewUrl,
-                canvasJson: JSON.stringify(canvas.toJSON())
-            }
-        });
+        // Check if editing an existing cart item
+        if (cartItemId) {
+            const { updateItem } = useCartStore.getState();
+            updateItem(cartItemId, {
+                previewUrl: previewUrl,
+                customizationData: customizationData
+            });
 
-        toggleCart();
-        toast.success("It's in the bag!", {
-            style: { borderRadius: '16px', background: '#333', color: '#fff' }
-        });
+            toggleCart();
+            toast.success("Design updated!", {
+                style: { borderRadius: '16px', background: '#333', color: '#fff' }
+            });
+        } else {
+            // Adding new item to cart
+            addItem({
+                id: uuidv4(),
+                productId,
+                product: product,
+                quantity: 1,
+                price: product.basePrice,
+                previewUrl: previewUrl,
+                designId: uuidv4(), // Mark as custom design
+                customizationData: customizationData
+            });
+
+            toggleCart();
+            toast.success("It's in the bag!", {
+                style: { borderRadius: '16px', background: '#333', color: '#fff' }
+            });
+        }
     };
 
     const handleSaveDesign = async () => {

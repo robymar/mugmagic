@@ -59,11 +59,14 @@ export function useCanvasTexture(fabricCanvas: fabric.Canvas | null) {
                             loadedTexture.magFilter = THREE.LinearFilter;
                             loadedTexture.generateMipmaps = false;
 
-                            // Center the texture on the cylinder opposite to handle
-                            loadedTexture.wrapS = THREE.RepeatWrapping;
+                            // CORREGIDO: Cambiar a ClampToEdgeWrapping para evitar repetición
+                            loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
                             loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-                            loadedTexture.offset.set(0.25, 0.1); // Ajustar para centrar TODO el diseño
-                            loadedTexture.repeat.set(1, 0.8);  // Mostrar más de la textura (menos zoom)
+
+                            // CORREGIDO: No usar offset ni repeat aquí
+                            // El mapeo UV en la geometría ya maneja la posición
+
+                            loadedTexture.needsUpdate = true; // IMPORTANTE
 
                             // Dispose old texture to prevent memory leaks
                             if (textureRef.current) {
@@ -74,12 +77,11 @@ export function useCanvasTexture(fabricCanvas: fabric.Canvas | null) {
                             setTexture(loadedTexture);
                             console.log('[useCanvasTexture] Texture snapshot updated from DataURL');
                         },
-                        undefined, // onProgress (not needed)
+                        undefined,
                         (error) => {
                             console.error('[useCanvasTexture] Failed to load texture from DataURL:', error);
                         }
                     );
-
                 } catch (err) {
                     console.error('[useCanvasTexture] Failed to generate snapshot:', err);
                 }
@@ -108,11 +110,11 @@ export function useCanvasTexture(fabricCanvas: fabric.Canvas | null) {
                     loadedTexture.magFilter = THREE.LinearFilter;
                     loadedTexture.generateMipmaps = false;
 
-                    // Center the texture (same as update function)
-                    loadedTexture.wrapS = THREE.RepeatWrapping;
+                    // CORREGIDO: Igual que arriba
+                    loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
                     loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-                    loadedTexture.offset.set(0.25, 0.1);
-                    loadedTexture.repeat.set(1, 0.8);
+
+                    loadedTexture.needsUpdate = true; // IMPORTANTE
 
                     textureRef.current = loadedTexture;
                     setTexture(loadedTexture);

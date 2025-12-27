@@ -11,70 +11,24 @@ export default async function ProductsPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
             {/* Hero Section */}
-            <section className="relative py-16 px-4 sm:px-6 lg:px-8 overflow-hidden">
-                {/* Background Decoration */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-200 rounded-full opacity-20 blur-3xl" />
-                    <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-purple-200 rounded-full opacity-20 blur-3xl" />
-                </div>
-
-                <div className="relative max-w-7xl mx-auto text-center space-y-6">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold mb-4">
-                        <Sparkles size={16} />
-                        <span>Personalized Just for You</span>
-                    </div>
-
-                    <h1 className="text-5xl md:text-6xl font-black text-gray-900 leading-tight">
+            <section className="relative py-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
+                <div className="relative max-w-7xl mx-auto text-center space-y-3">
+                    <h1 className="text-3xl md:text-4xl font-black text-gray-900 leading-tight">
                         Choose Your
-                        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 ml-2">
                             Perfect Canvas
                         </span>
                     </h1>
 
-                    <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                        Premium quality mugs ready for your creativity. Design, preview in 3D, and bring your ideas to life.
+                    <p className="text-sm md:text-base text-gray-600 max-w-2xl mx-auto flex items-center justify-center gap-4">
+                        <span>✨ 100% Customizable</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span>★ 4.8 Avg. Rating</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span>🚀 Fast Shipping</span>
                     </p>
-
-                    {/* Quick Stats */}
-                    <div className="flex flex-wrap justify-center gap-8 pt-8">
-                        <div className="text-center">
-                            <div className="text-3xl font-black text-blue-600">{allProducts.length}+</div>
-                            <div className="text-sm text-gray-500 font-medium">Products</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-black text-purple-600">100%</div>
-                            <div className="text-sm text-gray-500 font-medium">Customizable</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-black text-pink-600">★ 4.8</div>
-                            <div className="text-sm text-gray-500 font-medium">Avg. Rating</div>
-                        </div>
-                    </div>
                 </div>
             </section>
-
-            {/* Featured Products Highlight */}
-            {featuredProducts.length > 0 && (
-                <section className="py-8 px-4 sm:px-6 lg:px-8">
-                    <div className="max-w-7xl mx-auto">
-                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white shadow-2xl">
-                            <div className="flex items-center gap-3 mb-4">
-                                <Award size={28} className="text-yellow-300" />
-                                <h2 className="text-2xl md:text-3xl font-black">
-                                    Featured Collection
-                                </h2>
-                            </div>
-                            <p className="text-blue-100 mb-6 max-w-2xl">
-                                Our hand-picked selection of bestsellers and new arrivals. Start with these crowd favorites!
-                            </p>
-                            <div className="flex items-center gap-2 text-sm">
-                                <TrendingUp size={16} />
-                                <span className="font-semibold">Most popular this month</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
 
             {/* Main Product Grid */}
             <section className="py-12 px-4 sm:px-6 lg:px-8">

@@ -65,5 +65,19 @@ export const TEMPLATES: Template[] = [
             textColor: '#333333',
             fontFamily: 'Inter'
         }
+    },
+    {
+        id: 'stitch-tropical',
+        title: 'Blue Alien Tropical',
+        description: 'Cute blue monster with hibiscus flowers',
+        category: 'holidays',
+        thumbnail: '/images/stitch-pattern.png',
+        baseProductId: 'mug-11oz',
+        designData: {
+            text: 'Ohana means Family',
+            textColor: '#1E88E5',
+            fontFamily: 'Pacifico',
+            image: '/images/stitch-pattern.png'
+        }
     }
 ];

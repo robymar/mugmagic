@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getProductBySlugFromDB, getProductsFromDB } from '@/lib/db/products';
+import { getProductBySlug } from '@/data/products';
 import { ProductGallery } from '@/components/product/ProductGallery';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
@@ -11,8 +12,14 @@ import {
     Check, Heart, Share2, ChevronRight
 } from 'lucide-react';
 
+import { createClient } from '@supabase/supabase-js';
+
 export async function generateStaticParams() {
-    const { products } = await getProductsFromDB();
+    const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { products } = await getProductsFromDB(1, 100, supabase);
     return products.map((product) => ({
         slug: product.slug,
     }));
@@ -20,7 +27,14 @@ export async function generateStaticParams() {
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
-    const product = await getProductBySlugFromDB(slug);
+
+    // Try database first, then fallback to local data
+    let product = await getProductBySlugFromDB(slug);
+
+    if (!product) {
+        // Fallback to local products data
+        product = getProductBySlug(slug) || null;
+    }
 
     if (!product) {
         notFound();
@@ -179,7 +193,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
                         {/* CTA Buttons */}
                         <div className="space-y-3">
-                            <Link href={`/editor/${product.id}`} className="block">
+                            <Link href={`/editor/${product.slug}`} className="block">
                                 <button className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-3">
                                     <Sparkles size={24} />
                                     Customize Your Design

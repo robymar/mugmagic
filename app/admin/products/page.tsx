@@ -10,9 +10,12 @@ export default function AdminProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [categories, setCategories] = useState<any[]>([]);
 
     useEffect(() => {
         fetchProducts();
+        fetchCategories();
     }, []);
 
     const fetchProducts = async () => {
@@ -24,6 +27,16 @@ export default function AdminProductsPage() {
             console.error('Failed to fetch products', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch('/api/categories');
+            const data = await res.json();
+            setCategories(data || []);
+        } catch (error) {
+            console.error('Failed to fetch categories', error);
         }
     };
 
@@ -45,9 +58,11 @@ export default function AdminProductsPage() {
         }
     };
 
-    const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = products.filter(product => {
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+        return matchesSearch && matchesCategory;
+    });
 
     return (
         <div className="space-y-8">
@@ -76,6 +91,16 @@ export default function AdminProductsPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+                <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                    <option value="all">All Categories</option>
+                    {categories.map(cat => (
+                        <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                    ))}
+                </select>
             </div>
 
             {/* Products Table */}

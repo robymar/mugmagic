@@ -23,9 +23,15 @@ export default function AdminLayout({
                     </Link>
                     <Link
                         href="/admin/products"
-                        className="block px-4 py-3 rounded-lg bg-white/10 text-white font-medium hover:bg-white/20 transition-colors"
+                        className="block px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
                     >
                         📦 Products
+                    </Link>
+                    <Link
+                        href="/admin/categories"
+                        className="block px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                        🏷️ Categories
                     </Link>
                     <Link
                         href="/admin/orders"
@@ -33,7 +39,27 @@ export default function AdminLayout({
                     >
                         🛍️ Orders
                     </Link>
-                    <div className="pt-8 border-t border-white/10 mt-8">
+                    <Link
+                        href="/admin/customers"
+                        className="block px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                        👥 Customers
+                    </Link>
+                    <Link
+                        href="/admin/content"
+                        className="block px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    >
+                        🎨 Content
+                    </Link>
+                    <div className="pt-4 border-t border-white/10 mt-4">
+                        <Link
+                            href="/admin/settings"
+                            className="block px-4 py-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                        >
+                            ⚙️ Settings
+                        </Link>
+                    </div>
+                    <div className="pt-4 border-t border-white/10 mt-4">
                         <Link
                             href="/"
                             className="block px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"

@@ -94,26 +94,53 @@ export async function POST(request: Request) {
     }
 
     try {
+        // Get raw body first for debugging
+        const rawBody = await request.text();
+        console.log('Raw request body:', rawBody);
+
+        const parsedData = JSON.parse(rawBody);
+        console.log('Parsed data:', JSON.stringify(parsedData, null, 2));
+
         // Validate request with Zod
-        const { data, error: validationError } = await validateRequest(request, productSchema);
-        if (validationError) return validationError;
+        const validation = productSchema.safeParse(parsedData);
+        if (!validation.success) {
+            console.error('Validation Error:', validation.error);
+            return NextResponse.json(
+                { error: 'Validation failed', details: validation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const data = validation.data;
 
         // Sanitize product data to prevent XSS
         const sanitizedData = sanitizeProductData(data);
 
         const newProduct: Product = {
             id: sanitizedData.id || uuidv4(),
-            slug: sanitizedData.slug || sanitizedData.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
+            slug: sanitizedData.slug && sanitizedData.slug.trim() !== ''
+                ? sanitizedData.slug
+                : sanitizedData.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, ''),
             name: sanitizedData.name,
             description: sanitizedData.description || '',
             longDescription: sanitizedData.longDescription || '',
             category: sanitizedData.category,
             basePrice: Number(sanitizedData.basePrice),
             compareAtPrice: sanitizedData.compareAtPrice ? Number(sanitizedData.compareAtPrice) : undefined,
-            images: sanitizedData.images || { thumbnail: '', gallery: [] },
-            specifications: sanitizedData.specifications || {},
-            variants: sanitizedData.variants || [],
-            tags: sanitizedData.tags || [],
+            images: {
+                thumbnail: sanitizedData.images?.thumbnail || '',
+                gallery: Array.isArray(sanitizedData.images?.gallery) ? sanitizedData.images.gallery : []
+            },
+            specifications: sanitizedData.specifications || {
+                capacity: '',
+                material: '',
+                dishwasherSafe: true,
+                microwaveSafe: true,
+                dimensions: { width: 0, height: 0, diameter: 0 },
+                printableArea: { width: 0, height: 0 }
+            },
+            variants: Array.isArray(sanitizedData.variants) ? sanitizedData.variants : [],
+            tags: Array.isArray(sanitizedData.tags) ? sanitizedData.tags : [],
             inStock: sanitizedData.inStock ?? true,
             featured: sanitizedData.featured ?? false,
             bestseller: sanitizedData.bestseller ?? false,
@@ -122,13 +149,20 @@ export async function POST(request: Request) {
             reviewCount: 0
         };
 
+        console.log('Product to be created:', JSON.stringify(newProduct, null, 2));
+
         await createProductInDB(newProduct);
 
         return NextResponse.json(newProduct, { status: 201 });
-    } catch (error) {
+    } catch (error: any) {
         console.error('API Error:', error);
         return NextResponse.json(
-            { error: 'Failed to create product' },
+            {
+                error: 'Failed to create product',
+                details: error.message || String(error),
+                code: error.code,
+                hint: error.hint
+            },
             { status: 500 }
         );
     }

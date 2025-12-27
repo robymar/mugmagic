@@ -12,7 +12,7 @@ interface CartItemProps {
 }
 
 export const CartItem: React.FC<CartItemProps> = ({ item }) => {
-    const { updateQuantity, removeItem } = useCartStore();
+    const { updateQuantity, removeItem, closeCart } = useCartStore();
 
     const increaseQuantity = () => {
         updateQuantity(item.id, item.quantity + 1);
@@ -131,7 +131,8 @@ export const CartItem: React.FC<CartItemProps> = ({ item }) => {
                 {/* Edit Design Link */}
                 {item.designId && (
                     <Link
-                        href={`/editor/${item.productId}?designId=${item.designId}`}
+                        href={`/editor/${item.product.slug}?cartItemId=${item.id}`}
+                        onClick={closeCart}
                         className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium mt-2 hover:underline"
                     >
                         <Edit size={12} />

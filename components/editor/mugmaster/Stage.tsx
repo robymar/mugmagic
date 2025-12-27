@@ -57,7 +57,7 @@ export const Stage = () => {
                     ? 'opacity-100 scale-100 translate-y-0'
                     : 'opacity-0 scale-95 translate-y-4 absolute pointer-events-none'}
             `}>
-                <div className="relative w-[500px] h-[500px] bg-white rounded-3xl shadow-2xl overflow-hidden border-8 border-white ring-1 ring-gray-100/50">
+                <div className="relative w-[800px] h-[360px] bg-white rounded-xl shadow-2xl overflow-hidden border-8 border-white ring-1 ring-gray-100/50">
                     <EditorCanvas />
 
                     {/* Safe Zone Indicators (Mock) */}

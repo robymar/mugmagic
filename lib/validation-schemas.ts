@@ -31,16 +31,16 @@ export const productVariantSchema = z.object({
     // Prevent extremely large negative numbers that could result in zero/negative total price
     // Assuming a reasonable max discount, or simply flag suspicious inputs.
     // For now, we allow negative for discounts but user input should be reasonable.
-    priceModifier: z.number().safe(), 
+    priceModifier: z.number().safe(),
 });
 
 export const productSchema = z.object({
     id: z.string().optional(),
     name: z.string().min(1).max(100),
-    slug: z.string().min(1).max(100),
-    description: z.string().min(10).max(500),
-    longDescription: z.string().min(10).max(2000).optional(),
-    category: z.enum(['mug', 'travel-mug', 'camping-mug', 'other']),
+    slug: z.string().max(100).optional().or(z.literal('')),
+    description: z.string().min(1).max(500),
+    longDescription: z.string().max(2000).optional(),
+    category: z.string().min(1),
     basePrice: z.number().positive(),
     compareAtPrice: z.number().positive().optional(),
     inStock: z.boolean().default(true),
@@ -48,6 +48,12 @@ export const productSchema = z.object({
     bestseller: z.boolean().default(false),
     new: z.boolean().default(false),
     variants: z.array(productVariantSchema).optional(),
+    images: z.object({
+        thumbnail: z.string(),
+        gallery: z.array(z.string())
+    }).optional(),
+    specifications: z.any().optional(),
+    tags: z.array(z.string()).optional(),
 });
 
 // ==========================================
@@ -79,7 +85,7 @@ export const cartSchema = z.object({
 // Regex to prevent basic XSS payloads (simple heuristic: ban < >)
 // A more robust solution involves sanitization on output, but input validation helps.
 const safeStringResponse = 'Invalid characters detected';
-const noHtmlRegex = /^[^<>]*$/; 
+const noHtmlRegex = /^[^<>]*$/;
 
 export const shippingInfoSchema = z.object({
     firstName: z.string()

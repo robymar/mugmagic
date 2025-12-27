@@ -66,7 +66,7 @@ const EditorCanvas = () => {
             resizeObserver.disconnect();
             fabricCanvas.dispose();
         };
-    }, [isMounted, setCanvas, mugColor]);
+    }, [isMounted, setCanvas]);
 
     // Update canvas background when mugColor changes
     useEffect(() => {

@@ -10,67 +10,103 @@ import { useCanvasTexture } from './useCanvasTexture';
 
 const RealisticMugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null; mugColor: string }) => {
     const meshRef = useRef<THREE.Mesh>(null);
-    const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
 
-    // Geometry for the Mug Body (Lathe)
+    // Geometry for the Mug Body - CORRECTED UV MAPPING
     const mugGeometry = useMemo(() => {
         const points = [];
-        // Profile of a standard ceramic mug
-        // Inside bottom
-        points.push(new THREE.Vector2(0, 0.1));
-        points.push(new THREE.Vector2(0.9, 0.1));
-        // Inside wall
-        points.push(new THREE.Vector2(0.9, 2.4));
-        // Lip (rounded top)
-        points.push(new THREE.Vector2(0.95, 2.5));
-        points.push(new THREE.Vector2(1.0, 2.4));
-        // Outside wall
-        points.push(new THREE.Vector2(1.0, 0.1));
-        // Outside bottom fillet
-        points.push(new THREE.Vector2(0.9, 0.0));
-        points.push(new THREE.Vector2(0.0, 0.0));
+        // Corrected profile with clear coordinates
+        points.push(new THREE.Vector2(0, 0));      // Center bottom
+        points.push(new THREE.Vector2(0.9, 0));    // Outer base
+        points.push(new THREE.Vector2(0.9, 0.1));  // Inner wall start
+        points.push(new THREE.Vector2(0.9, 2.4));  // Inner wall top
+        points.push(new THREE.Vector2(0.95, 2.5)); // Rounded lip
+        points.push(new THREE.Vector2(1.0, 2.4));  // Outer wall top
+        points.push(new THREE.Vector2(1.0, 0.1));  // Outer wall bottom
+        points.push(new THREE.Vector2(0.9, 0));    // Return to base
 
-        // Generate geometry
         const geometry = new THREE.LatheGeometry(points, 64);
-
-        // Calculate UVs manually to wrap the texture around the outer wall correctly
         const posAttribute = geometry.attributes.position;
         const uvAttribute = geometry.attributes.uv;
+
+        // CORRECT values for outer wall
+        const outerWallBottomY = 0.1;  // Where outer wall starts
+        const outerWallTopY = 2.4;     // Where outer wall ends
+
+        // Epsilon to avoid floating point misses
+        const EPSILON = 0.001;
 
         for (let i = 0; i < posAttribute.count; i++) {
             const x = posAttribute.getX(i);
             const z = posAttribute.getZ(i);
             const y = posAttribute.getY(i);
 
-            // Polar coordinates for wrapping
-            const angle = Math.atan2(z, x); // -PI to PI
-            let u = (angle / (2 * Math.PI)) + 0.5; // 0 to 1
-
-            // Adjust U to center the design on the "front" (usually -Z or +Z depending on rotation)
-            // Flipping/offsetting as needed. 
-            u = (u + 0.25) % 1;
-
-            // Simple V based on height (roughly 0 to 2.5)
-            // We want the printable area (middle ~2 units) to map to 0-1
-            // Approx mapping: y=0.2 -> v=0, y=2.3 -> v=1
-            const v = (y - 0.2) / 2.1;
-
-            // Only apply this mapping to outer wall points (radius approx 1.0)
+            // Radius in XZ plane
             const radius = Math.sqrt(x * x + z * z);
-            if (radius > 0.95 && y > 0.05 && y < 2.45) {
-                uvAttribute.setXY(i, u, v);
+
+            // PHYSICAL DIMENSIONS (Unit Conversion)
+            // Model Height: 2.5 units = 10 cm Physical Height
+            // Scale: 1 cm = 0.25 units
+            // Printable Height: 9 cm (Centered)
+            // Margins: 0.5 cm Top / 0.5 cm Bottom
+
+            const marginUnits = 0.5 * 0.25; // 0.125 units
+            const printableBottomUnits = marginUnits; // 0.125
+            const printableTopUnits = 2.5 - marginUnits; // 2.375
+            const printableHeightUnits = printableTopUnits - printableBottomUnits; // 2.25
+
+            // Outer wall vertices check 
+            if (radius > 0.95 && y > (outerWallBottomY - EPSILON) && y < (outerWallTopY + EPSILON)) {
+
+                // === U COORDINATE - HORIZONTAL ===
+                let angle = Math.atan2(z, x);
+                if (angle < 0) angle += 2 * Math.PI;
+                let u01 = 1 - (angle / (2 * Math.PI)); // 0..1 around circumference
+
+                // FIX: Calculated Coverage for 20cm width
+                // Mug Radius ~1.0 unit = 4cm -> Diameter 8cm -> Circumference ~25.1cm
+                // 20cm / 25.1cm = ~0.796
+                // Reducing slightly to 0.78 ensures circles are circular (not wide).
+                const printableCoverage = 0.78;
+                const uStart = 0.5 - (printableCoverage / 2);
+
+                let u = (u01 - uStart) / printableCoverage;
+
+                // === V COORDINATE - VERTICAL ===
+                // Map mesh Y to 0..1 within the PHYSICAL 9cm ZONE
+                // y = 0.125 -> v = 0
+                // y = 2.375 -> v = 1
+                let v = (y - printableBottomUnits) / printableHeightUnits;
+
+                // V is NOT inverted (0 is bottom)
+
+                // CLAMPING
+                const safeU = Math.max(0, Math.min(1, u));
+                const safeV = Math.max(0, Math.min(1, v));
+
+                uvAttribute.setXY(i, safeU, safeV);
             } else {
-                // Map other parts to a whitespace area of texture or just keep standard
-                // ideally 0,0 if texture is transparent or white
+                // Non-printable vertices
                 uvAttribute.setXY(i, 0, 0);
             }
         }
 
         geometry.computeVertexNormals();
+        uvAttribute.needsUpdate = true;
+
+        // DEBUG: Log UV stats
+        console.log('UV Stats:');
+        const uvArray = geometry.attributes.uv.array;
+        let uvCount = 0;
+        for (let i = 0; i < uvArray.length; i += 2) {
+            if (uvArray[i] > 0 || uvArray[i + 1] > 0) {
+                uvCount++;
+            }
+        }
+        console.log(`Vertices with UV > 0: ${uvCount}/${uvArray.length / 2}`);
+
         return geometry;
     }, []);
 
-    // Geometry for Handle (Tube)
     const handleGeometry = useMemo(() => {
         const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(0.95, 2.0, 0),
@@ -82,43 +118,52 @@ const RealisticMugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null
         return new THREE.TubeGeometry(curve, 32, 0.15, 16, false);
     }, []);
 
-    // Update material texture
+    // DEBUG: Verify texture is loaded in 3D
     useEffect(() => {
-        if (materialRef.current && texture) {
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.ClampToEdgeWrapping; // Don't repeat vertically
-
-            // Texture placement adjustments
-            texture.repeat.set(1, 1);
-            // Invert U if needed or shift
-            texture.center.set(0.5, 0.5);
-            texture.rotation = 0;
-
-            materialRef.current.map = texture;
-            materialRef.current.needsUpdate = true;
+        if (texture) {
+            console.log('✅ Textura cargada en 3D:', {
+                width: texture.image?.width,
+                height: texture.image?.height,
+                wrapS: texture.wrapS,
+                wrapT: texture.wrapT
+            });
         }
     }, [texture]);
 
-    // Update color
-    useEffect(() => {
-        if (materialRef.current) {
-            materialRef.current.color.set(mugColor);
-        }
-    }, [mugColor]);
-
     return (
-        <group position={[0, -1.25, 0]}> {/* Center vertically */}
+        <group position={[0, -1.25, 0]}>
+            {/* BASE MUG - Color Only */}
             <mesh geometry={mugGeometry} receiveShadow castShadow>
                 <meshPhysicalMaterial
-                    ref={materialRef}
                     color={mugColor}
                     roughness={0.15}
                     metalness={0.1}
                     clearcoat={0.5}
                     clearcoatRoughness={0.1}
                     side={THREE.DoubleSide}
+                    envMapIntensity={0.5}
                 />
             </mesh>
+
+            {/* DESIGN LAYER - 2D Design Only */}
+            {texture && (
+                <mesh geometry={mugGeometry}>
+                    <meshPhysicalMaterial
+                        map={texture}
+                        color="#ffffff"
+                        transparent={true}
+                        alphaTest={0.01}  // CHANGED: 0.05 -> 0.01 for better transparency
+                        roughness={0.3}
+                        metalness={0.0}
+                        side={THREE.DoubleSide}
+                        depthWrite={false}
+                        polygonOffset={true}
+                        polygonOffsetFactor={-1}
+                        polygonOffsetUnits={-1}
+                    />
+                </mesh>
+            )}
+
             <mesh geometry={handleGeometry} receiveShadow castShadow>
                 <meshPhysicalMaterial
                     color={mugColor}
@@ -126,6 +171,7 @@ const RealisticMugMesh = ({ texture, mugColor }: { texture: THREE.Texture | null
                     metalness={0.1}
                     clearcoat={0.5}
                     clearcoatRoughness={0.1}
+                    envMapIntensity={0.5}
                 />
             </mesh>
         </group>
@@ -142,14 +188,22 @@ export default function ProductViewer3D() {
                 {/* Environment & Lighting */}
                 <Environment preset="studio" />
                 <ambientLight intensity={0.5} />
+
+                {/* Main Key Light - Soft Front Right */}
                 <spotLight
-                    position={[10, 10, 5]}
-                    angle={0.15}
+                    position={[5, 5, 5]}
+                    angle={0.4}
                     penumbra={1}
-                    intensity={1}
+                    intensity={0.8}
                     castShadow
                     shadow-bias={-0.0001}
                 />
+
+                {/* Fill Light - Front Left */}
+                <pointLight position={[-5, 2, 5]} intensity={0.4} />
+
+                {/* Rim Light - Back High */}
+                <pointLight position={[0, 5, -5]} intensity={0.5} />
 
                 <Center>
                     <RealisticMugMesh texture={texture} mugColor={mugColor} />

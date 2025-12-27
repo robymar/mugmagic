@@ -153,7 +153,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
                         </span>
                     </div>
 
-                    <Link href={`/editor/${product.id}`}>
+                    <Link href={`/editor/${product.slug}`}>
                         <button className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-sm">
                             Customize
                             <ShoppingCart size={16} />

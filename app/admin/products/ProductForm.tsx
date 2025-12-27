@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Product } from '@/types/product';
 import { ChevronLeft, Save, Plus } from 'lucide-react';
@@ -39,9 +39,23 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
     });
 
     const [galleryInput, setGalleryInput] = useState('');
+    const [categories, setCategories] = useState<any[]>([]);
+
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch('/api/categories');
+            const data = await res.json();
+            setCategories(data || []);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
-        // ... (keep existing handleSubmit)
         e.preventDefault();
         setLoading(true);
 
@@ -49,21 +63,28 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
             const url = isEdit ? `/api/products/${initialData?.id}` : '/api/products';
             const method = isEdit ? 'PUT' : 'POST';
 
+            console.log('Sending product data:', formData);
+
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData),
             });
 
+            const data = await res.json();
+            console.log('Response:', data);
+
             if (res.ok) {
                 router.push('/admin/products');
                 router.refresh();
             } else {
-                alert('Failed to save product');
+                const errorMsg = data.error || data.message || 'Failed to save product';
+                console.error('Save error:', errorMsg, data);
+                alert(`Failed to save product: ${errorMsg}`);
             }
         } catch (error) {
             console.error('Error saving product:', error);
-            alert('Error saving product');
+            alert(`Error saving product: ${error}`);
         } finally {
             setLoading(false);
         }
@@ -160,11 +181,12 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                                     className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     value={formData.category}
                                     onChange={e => setFormData({ ...formData, category: e.target.value as any })}
+                                    required
                                 >
-                                    <option value="mug">Mug</option>
-                                    <option value="bottle">Bottle</option>
-                                    <option value="plate">Plate</option>
-                                    <option value="accessories">Accessories</option>
+                                    <option value="">Select a category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                                    ))}
                                 </select>
                             </div>
 
