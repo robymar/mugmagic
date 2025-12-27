@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Image as ImageIcon, User } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Image as ImageIcon, User, Upload } from 'lucide-react';
 import Image from 'next/image';
+import { uploadStickerFile } from '@/lib/storage/uploadSticker';
 
 type ContentType = 'stickers' | 'avatars';
 
@@ -35,6 +36,9 @@ export default function ContentPage() {
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [useUrl, setUseUrl] = useState(false);
     const [formData, setFormData] = useState<Partial<Sticker | Avatar>>({
         name: '',
         image_url: '',
@@ -74,8 +78,23 @@ export default function ContentPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setUploading(true);
 
         try {
+            let imageUrl = formData.image_url || '';
+
+            // Upload file to storage if sticker and file is selected
+            if (activeTab === 'stickers' && uploadFile && !editingId) {
+                try {
+                    imageUrl = await uploadStickerFile(uploadFile);
+                } catch (uploadError: any) {
+                    alert(uploadError.message || 'Failed to upload file');
+                    setLoading(false);
+                    setUploading(false);
+                    return;
+                }
+            }
+
             const endpoint = activeTab === 'stickers' ? '/api/stickers' : '/api/avatars';
             const url = editingId ? `${endpoint}/${editingId}` : endpoint;
             const method = editingId ? 'PUT' : 'POST';
@@ -83,7 +102,10 @@ export default function ContentPage() {
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({
+                    ...formData,
+                    image_url: imageUrl
+                })
             });
 
             if (res.ok) {
@@ -97,6 +119,7 @@ export default function ContentPage() {
             alert('Error saving item');
         } finally {
             setLoading(false);
+            setUploading(false);
         }
     };
 
@@ -129,6 +152,8 @@ export default function ContentPage() {
     const handleCancel = () => {
         setShowForm(false);
         setEditingId(null);
+        setUploadFile(null);
+        setUseUrl(false);
         setFormData({
             name: '',
             image_url: '',
@@ -211,27 +236,107 @@ export default function ContentPage() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL</label>
-                            <input
-                                type="url"
-                                required
-                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={formData.image_url}
-                                onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                                placeholder="https://example.com/image.svg"
-                            />
-                            {formData.image_url && (
-                                <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-sm text-gray-600 mb-2">Preview:</p>
-                                    <img
-                                        src={formData.image_url}
-                                        alt="Preview"
-                                        className="w-24 h-24 object-contain rounded-lg bg-white p-2 border border-gray-200"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
-                                        }}
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                {activeTab === 'stickers' ? 'Image' : 'Image URL'}
+                            </label>
+
+                            {activeTab === 'stickers' && !editingId ? (
+                                <>
+                                    {/* Toggle between file upload and URL */}
+                                    <div className="flex gap-2 mb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseUrl(false)}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!useUrl
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            <Upload size={16} className="inline mr-2" />
+                                            Upload File
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setUseUrl(true)}
+                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${useUrl
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            Use URL
+                                        </button>
+                                    </div>
+
+                                    {!useUrl ? (
+                                        /* File Upload */
+                                        <div>
+                                            <input
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setUploadFile(file);
+                                                        // Auto-fill name if empty
+                                                        if (!formData.name) {
+                                                            const fileName = file.name.split('.')[0];
+                                                            setFormData({ ...formData, name: fileName });
+                                                        }
+                                                    }
+                                                }}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                PNG, JPG, SVG, WebP (max 5MB)
+                                            </p>
+                                            {uploadFile && (
+                                                <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                                                    <p className="text-sm text-gray-600 mb-2">Preview:</p>
+                                                    <img
+                                                        src={URL.createObjectURL(uploadFile)}
+                                                        alt="Preview"
+                                                        className="w-24 h-24 object-contain rounded-lg bg-white p-2 border border-gray-200"
+                                                    />
+                                                    <p className="text-xs text-gray-500 mt-2">{uploadFile.name}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        /* URL Input */
+                                        <input
+                                            type="url"
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            value={formData.image_url}
+                                            onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                                            placeholder="https://example.com/image.png"
+                                        />
+                                    )}
+                                </>
+                            ) : (
+                                /* Avatars or editing mode - always use URL */
+                                <>
+                                    <input
+                                        type="url"
+                                        required
+                                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        value={formData.image_url}
+                                        onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                                        placeholder="https://example.com/image.svg"
                                     />
-                                </div>
+                                    {formData.image_url && (
+                                        <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-600 mb-2">Preview:</p>
+                                            <img
+                                                src={formData.image_url}
+                                                alt="Preview"
+                                                className="w-24 h-24 object-contain rounded-lg bg-white p-2 border border-gray-200"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                         <div className="grid grid-cols-2 gap-4">
