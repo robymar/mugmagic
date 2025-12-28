@@ -13,6 +13,9 @@ import Image from 'next/image';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { stripePromise } from '@/lib/stripe';
 import { createClient } from '@/utils/supabase/client';
+import { ReservationTimer } from '@/components/checkout/ReservationTimer';
+import { initializeCheckout, generateIdempotencyKey } from '@/lib/checkout-utils';
+import toast from 'react-hot-toast';
 
 //Types
 type CheckoutStep = 'shipping' | 'payment';
@@ -135,7 +138,10 @@ const CheckoutForm = ({
 // --- Main Page Component ---
 export default function CheckoutPage() {
     const router = useRouter();
-    const { items, subtotal, shipping, discount, total, clearCart } = useCartStore();
+    const {
+        items, subtotal, shipping, discount, total, clearCart,
+        checkoutId, setCheckoutReservation, isReservationActive, clearCheckoutReservation
+    } = useCartStore();
 
     const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
     const [shippingMethod, setShippingMethod] = useState('standard');
@@ -191,20 +197,47 @@ export default function CheckoutPage() {
             }));
         }
 
-        // ... imports moved to top level already
+        // STEP 1: Create stock reservations
+        const loadingToast = toast.loading('Reserving your items...');
 
-        // Remove the invalid block from here. 
-        // The user state and effect should be already at the top of the component (I will verify/add them if missing in next step, but first cleaning this mess).
-
-        // Create PaymentIntent as soon as shipping is submitted
         try {
+            // Prepare items for reservation (variant_id, quantity)
+            const reservationItems = items.map(item => ({
+                variant_id: item.selectedVariant?.id || item.productId,
+                quantity: item.quantity
+            }));
+
+            const reservationResult = await initializeCheckout(reservationItems);
+
+            if (!reservationResult.success) {
+                toast.dismiss(loadingToast);
+                toast.error(reservationResult.error || 'Failed to reserve items. Please try again.');
+                return;
+            }
+
+            // Save reservation to cart store
+            setCheckoutReservation(
+                reservationResult.data!.checkout_id,
+                new Date(reservationResult.data!.expires_at)
+            );
+
+            toast.dismiss(loadingToast);
+            toast.success('Items reserved for 15 minutes! ⏱️');
+
+            // STEP 2: Create Payment Intent with checkout_id and idempotency key
+            const idempotencyKey = generateIdempotencyKey(user?.id);
+
             const res = await fetch("/api/create-payment-intent", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Idempotency-Key": idempotencyKey
+                },
                 body: JSON.stringify({
                     items,
                     shippingInfo,
                     shippingMethod,
+                    checkout_id: reservationResult.data!.checkout_id,
                     userId: user?.id
                 }),
             });
@@ -216,10 +249,15 @@ export default function CheckoutPage() {
                 setCurrentStep('payment');
             } else {
                 console.error("Failed to create payment intent:", data.error);
-                // Optionally show error toast
+                toast.error(data.error || 'Payment system error. Please try again.');
+                // Release reservation if payment intent fails
+                clearCheckoutReservation();
             }
         } catch (error) {
-            console.error("Error fetching payment intent:", error);
+            console.error("Error in checkout flow:", error);
+            toast.dismiss(loadingToast);
+            toast.error('An unexpected error occurred. Please try again.');
+            clearCheckoutReservation();
         }
     };
 
@@ -495,6 +533,13 @@ export default function CheckoutPage() {
                     {/* Order Summary Sidebar */}
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-xl shadow-md p-6 sticky top-6">
+                            {/* Reservation Timer */}
+                            {isReservationActive && (
+                                <div className="mb-6">
+                                    <ReservationTimer />
+                                </div>
+                            )}
+
                             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                                 <ShoppingBag size={20} />
                                 Order Summary

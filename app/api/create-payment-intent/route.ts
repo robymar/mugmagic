@@ -1,23 +1,33 @@
+/**
+ * Create Payment Intent Endpoint (Enhanced)
+ * 
+ * Improvements:
+ * - Idempotency support to prevent double charges
+ * - Stock reservation validation
+ * - Variant-based pricing
+ */
+
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { PRODUCTS } from '@/data/products';
-import { CartItem } from '@/stores/cartStore';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
 import { createPaymentIntentSchema, CartItemInput } from '@/lib/validation-schemas';
+import { withIdempotency, getIdempotencyKey } from '@/lib/idempotency-middleware';
+import { areReservationsValid } from '@/lib/stock-reservation';
+import { getVariantById } from '@/lib/db/variants';
+import { logInfo, logError, logWarn } from '@/lib/logger';
 
-// Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2024-04-10', // Use a pinned version or latest
+    apiVersion: '2024-04-10',
 });
 
-// Rate limiting for checkout (prevent card testing/inventory attacks)
+// Rate limiting
 const checkoutAttempts = new Map<string, { count: number; resetTime: number }>();
 
 function checkCheckoutRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
     const now = Date.now();
-    const windowMs = 60000 * 5; // 5 minutes window
-    const maxAttempts = 10; // 10 attempts per 5 mins
+    const windowMs = 60000 * 5; // 5 minutes
+    const maxAttempts = 10;
 
     if (checkoutAttempts.size > 1000) {
         for (const [key, value] of checkoutAttempts.entries()) {
@@ -39,56 +49,52 @@ function checkCheckoutRateLimit(ip: string): { allowed: boolean; resetTime?: num
     return { allowed: true };
 }
 
-const calculateOrderAmount = (items: CartItemInput[], shippingMethodId: string) => {
-    // 1. Calculate Subtotal from trusted product data
-    const subtotal = items.reduce((sum, item) => {
-        const product = PRODUCTS.find((p) => p.id === item.productId);
-        if (!product) {
-            throw new Error(`Product not found: ${item.productId}`);
+/**
+ * Calculate order amount from variants (not hardcoded products)
+ */
+async function calculateOrderAmountFromVariants(
+    items: CartItemInput[],
+    shippingMethodId: string
+): Promise<number> {
+    let subtotal = 0;
+
+    for (const item of items) {
+        // Get variant from database
+        const variant = await getVariantById(item.selectedVariant?.id || item.productId);
+
+        if (!variant) {
+            throw new Error(`Variant not found: ${item.selectedVariant?.id || item.productId}`);
         }
 
-        // Base price
-        let price = product.basePrice;
-
-        // Variant modifier
-        if (item.selectedVariant) {
-            const variant = product.variants?.find((v) => v.id === item.selectedVariant?.id);
-            if (variant) {
-                // Mitigate "Nullifier Discount" - Ensure price doesn't go below 0 (though Schema helps too)
-                price += variant.priceModifier;
-                if (price < 0) price = 0;
-            }
+        if (!variant.is_available) {
+            throw new Error(`Variant ${variant.name} is no longer available`);
         }
 
-        return sum + (price * item.quantity);
-    }, 0);
-
-    // 2. Calculate Shipping
-    let shippingCost = 5; // Standard default
-
-    // Free shipping threshold
-    if (subtotal >= 50) {
-        shippingCost = 0;
+        // Use variant's price directly (no modifiers needed)
+        subtotal += variant.price * item.quantity;
     }
 
-    // Shipping Method overrides
+    // Calculate shipping
+    let shippingCost = 5;
+
+    if (subtotal >= 50) {
+        shippingCost = 0; // Free shipping over €50
+    }
+
     switch (shippingMethodId) {
-        case 'standard': // "Standard"
-            break;
-        case 'express': // "Express"
+        case 'express':
             shippingCost = 10;
             break;
-        case 'overnight': // "Overnight"
+        case 'overnight':
             shippingCost = 25;
             break;
     }
 
-    // 3. Total
-    return (subtotal + shippingCost);
-};
+    return subtotal + shippingCost;
+}
 
-export async function POST(req: Request) {
-    // Rate Limit Check
+async function handlePaymentIntentCreation(req: Request) {
+    // Rate limit check
     const ip = getIP(req);
     const rateLimitCheck = checkCheckoutRateLimit(ip);
 
@@ -100,127 +106,130 @@ export async function POST(req: Request) {
         );
     }
 
+    // Validate request
+    const { data, error: validationError } = await validateRequest(req, createPaymentIntentSchema);
+    if (validationError) return validationError;
+
+    const { items, shippingInfo, shippingMethodId, checkout_id } = data!;
+
+    logInfo('Payment intent creation started', {
+        data: { itemCount: items.length, checkoutId: checkout_id, ip }
+    });
+
+    // CRITICAL: Verify reservations are still valid
+    if (checkout_id) {
+        const reservationsValid = await areReservationsValid(checkout_id);
+
+        if (!reservationsValid) {
+            logWarn('Reservations expired or invalid', { data: { checkout_id } });
+            return errorResponse(
+                'Your cart reservation has expired. Please start checkout again.',
+                400,
+                { code: 'RESERVATION_EXPIRED' }
+            );
+        }
+    } else {
+        logWarn('No checkout_id provided - proceeding without reservation check');
+    }
+
     try {
-        // Validate request body
-        const { data, error: validationError } = await validateRequest(req, createPaymentIntentSchema);
-        if (validationError) return validationError;
+        // Calculate amount from database variants (server-side pricing)
+        const amount = await calculateOrderAmountFromVariants(items, shippingMethodId || 'standard');
 
-        const { items, shippingInfo, shippingMethod, userId } = data!;
-
-        if (!items || items.length === 0) {
-            return errorResponse('No items in cart', 400);
+        if (amount <= 0) {
+            return errorResponse('Invalid amount calculated', 400);
         }
 
-        // ---------------------------------------------------------
-        // CRITICAL: Pre-Payment Stock Check
-        // ---------------------------------------------------------
-        // Prevent overselling by verifying stock before creating PaymentIntent.
-        for (const item of items) {
-            const { data: product, error } = await supabaseAdmin
-                .from('products')
-                .select('stock_count, in_stock, name')
-                .eq('id', item.productId)
-                .single();
+        logInfo('Order amount calculated', { data: { amount, currency: 'eur' } });
 
-            if (error || !product) {
-                // Fallback or error - safest is to fail checkout if product unknown in DB
-                return errorResponse(`Product unavailable: ${item.productId} (Ref: DB)`, 400);
-            }
+        // Create Stripe Payment Intent with idempotency
+        const idempotencyKey = getIdempotencyKey(req);
+        const stripeIdempotencyKey = idempotencyKey || `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            // check 'in_stock' boolean flag
-            if (!product.in_stock) {
-                return errorResponse(`Product "${product.name}" is currently out of stock.`, 400);
-            }
-
-            // Check numeric stock if available
-            // Note: If 'stock_count' is null, we assume unlimited or not tracked
-            if (typeof product.stock_count === 'number') {
-                if (product.stock_count < item.quantity) {
-                    return errorResponse(
-                        `Insufficient stock for "${product.name}". Only ${product.stock_count} remaining.`,
-                        400
-                    );
-                }
-            }
-        }
-
-        // Calculate amount in cents
-        // Note: verify currency. We assume EUR based on current app.
-        const amount = calculateOrderAmount(items, shippingMethod);
-        const amountInCents = Math.round(amount * 100);
-
-        // Security: Ensure at least minimum charge (e.g. 0.50 EUR for Stripe) unless pure free
-        if (amountInCents < 50) {
-            return errorResponse('Order total is too low to process.', 400);
-        }
-
-        // Create PaymentIntent
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: amountInCents,
+            amount: Math.round(amount * 100), // Convert to cents
             currency: 'eur',
             automatic_payment_methods: {
                 enabled: true,
             },
             metadata: {
-                shipping_name: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
-                shipping_city: shippingInfo.city,
-                user_id: userId || 'guest'
+                checkout_id: checkout_id || 'no_checkout_id',
+                customer_email: shippingInfo.email,
+                item_count: items.length.toString()
             }
+        }, {
+            idempotencyKey: stripeIdempotencyKey
         });
 
-        // --- DATABASE INTEGRATION ---
-        // Save pending order to Supabase
-        const orderNumber = `ORD-${paymentIntent.id.slice(-8).toUpperCase()}`;
+        // Save pending order to database
+        const orderNumber = `ORD-${Date.now()}`;
 
-        const { error: orderError } = await supabaseAdmin.from('orders').insert({
-            id: paymentIntent.id, // Link Order ID to PaymentIntent ID for easy lookup
-            order_number: orderNumber,
-            customer_email: shippingInfo.email,
-            shipping_info: shippingInfo,
-            total_amount: amount,
-            payment_status: 'pending',
-            payment_intent_id: paymentIntent.id,
-            user_id: userId || null // Link to User if authenticated
-        });
+        const { data: orderData, error: orderError } = await supabaseAdmin
+            .from('orders')
+            .insert({
+                id: paymentIntent.id,
+                order_number: orderNumber,
+                customer_email: shippingInfo.email,
+                shipping_info: shippingInfo,
+                total_amount: amount,
+                payment_status: 'pending',
+                payment_intent_id: paymentIntent.id
+            })
+            .select()
+            .single();
 
         if (orderError) {
-            console.error('Error saving order:', orderError);
-            // If we can't save the order, we probably shouldn't return the clientSecret
-            // because the client will pay but no order will exist.
-            // However, Stripe PI is created. Ideally verify DB insert first or use proper transaction.
-            // For now, logging error. A robust system would cancel the PI.
-        } else {
-            // Save Order Items
-            const orderItemsData = items.map((item: any) => ({
-                order_id: paymentIntent.id,
-                product_id: item.productId, // Use productId from CartItem
-                product_name: PRODUCTS.find(p => p.id === item.productId)?.name || 'Unknown Product', // Get name from trusted source
-                quantity: item.quantity,
-                price_at_purchase: PRODUCTS.find(p => p.id === item.productId)?.basePrice || 0, // Get base price from trusted source
-                variant_id: item.selectedVariant?.id || null,
-                variant_name: item.selectedVariant?.name || null,
-                customization_data: item.customizationData || null
+            logError('Failed to create order record', { data: orderError });
+            // Continue anyway - webhook will handle this
+        }
+
+        // Save order items with snapshots
+        if (orderData) {
+            const orderItems = await Promise.all(items.map(async (item) => {
+                const variant = await getVariantById(item.selectedVariant?.id || item.productId);
+
+                return {
+                    order_id: orderData.id,
+                    product_id: item.productId,
+                    product_name: variant?.name || 'Unknown Product',
+                    quantity: item.quantity,
+                    price_at_purchase: variant?.price || 0,
+                    variant_id: variant?.id,
+                    variant_name: variant?.name,
+                    customization_data: item.customizationData || null
+                };
             }));
 
             const { error: itemsError } = await supabaseAdmin
                 .from('order_items')
-                .insert(orderItemsData);
+                .insert(orderItems);
 
             if (itemsError) {
-                console.error('Error saving order items:', itemsError);
+                logError('Failed to create order items', { data: itemsError });
             }
         }
 
+        logInfo('Payment intent created successfully', {
+            data: { paymentIntentId: paymentIntent.id, orderNumber }
+        });
+
         return NextResponse.json({
             clientSecret: paymentIntent.client_secret,
-            dpmCheckerLink: `https://dashboard.stripe.com/settings/payment_methods/review?transaction_currency=eur&payment_intent=${paymentIntent.id}`,
+            paymentIntentId: paymentIntent.id,
+            orderNumber,
+            amount
         });
 
     } catch (error: any) {
-        console.error('Stripe error:', error);
-        return NextResponse.json(
-            { error: error.message },
-            { status: 500 }
-        );
+        logError('Payment intent creation failed', { data: error });
+
+        if (error.type === 'StripeCardError') {
+            return errorResponse(error.message, 400);
+        }
+
+        return errorResponse('Unable to process payment. Please try again.', 500);
     }
 }
+
+// Wrap with idempotency middleware
+export const POST = withIdempotency(handlePaymentIntentCreation, false);

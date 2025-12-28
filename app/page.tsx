@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/Button';
 import { getProductsFromDB } from '@/lib/db/products';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ArrowRight, Sparkles, Palette } from 'lucide-react';
+import { BannerCarousel } from '@/components/store/BannerCarousel';
+import { Product } from '@/types/product';
 
 export default async function Home() {
-  const { products } = await getProductsFromDB(1, 8);
+  const data = await getProductsFromDB(1, 8);
+  const products = (data.products || []) as Product[];
 
   // Filter for specific sections
   const featuredProducts = products.filter(p => p.featured).slice(0, 4);
@@ -15,31 +18,8 @@ export default async function Home() {
     <main className="min-h-screen bg-gray-50 text-gray-900">
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-blue-600 to-indigo-700 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10"></div>
-        <div className="container mx-auto px-6 py-8 md:py-12 relative z-10 flex flex-col items-center text-center">
-          <h1 className="text-3xl md:text-5xl font-black mb-3 tracking-tight leading-tight">
-            Design Your <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">
-              Dream Mug
-            </span>
-          </h1>
-          <p className="text-base md:text-lg text-blue-100 mb-6 max-w-lg leading-relaxed">
-            Create unique personalized gifts with our easy drag-and-drop editor and view them in stunning 3D.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link href="/products">
-              <Button className="text-sm px-5 py-2.5 h-auto shadow-lg hover:shadow-xl hover:scale-105 transition-all bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold">
-                Start Designing Now
-              </Button>
-            </Link>
-            <Link href="#templates">
-              <Button variant="secondary" className="text-sm px-5 py-2.5 h-auto bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/30 font-semibold">
-                View Templates
-              </Button>
-            </Link>
-          </div>
-        </div>
+      <section className="container mx-auto px-4 pt-6 pb-8">
+        <BannerCarousel />
       </section>
 
       {/* Start From Scratch Section */}

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { Package, Truck, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { StatusBadge } from '@/components/admin/StatusBadge';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,10 +95,7 @@ export default async function AdminOrdersPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${getStatusColor(order.payment_status)}`}>
-                                            {getStatusIcon(order.payment_status)}
-                                            {order.payment_status.toUpperCase()}
-                                        </span>
+                                        <StatusBadge status={order.payment_status} />
                                     </td>
                                     <td className="px-6 py-4 font-medium text-gray-900">
                                         €{order.total_amount?.toFixed(2)}

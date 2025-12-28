@@ -6,7 +6,8 @@ import { ActiveTab } from './MugMasterEditor';
 import { AvatarBuilder } from './AvatarBuilder';
 import { FontSelector } from './FontSelector';
 import { useDesignStore } from '@/stores/designStore';
-import { Type, Image as ImageIcon, Plus } from 'lucide-react';
+import { Type, Image as ImageIcon, Plus, Loader2 } from 'lucide-react';
+import { uploadUserImage } from '@/lib/storage/uploadUserImage';
 
 // Stickers Panel Component
 interface StickersPanelProps {
@@ -68,6 +69,7 @@ interface ToolPanelProps {
 
 export const ToolPanel = ({ activeTab }: ToolPanelProps) => {
     const { addText, addImage, canvas, activeObject, setMugColor } = useDesignStore();
+    const [isUploading, setIsUploading] = useState(false);
 
     if (!activeTab) return null;
 
@@ -200,19 +202,35 @@ export const ToolPanel = ({ activeTab }: ToolPanelProps) => {
                                 type="file"
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 accept="image/*"
-                                onChange={(e) => {
+                                disabled={isUploading}
+                                onChange={async (e) => {
                                     const file = e.target.files?.[0];
                                     if (file) {
-                                        const url = URL.createObjectURL(file);
-                                        addImage(url);
+                                        setIsUploading(true);
+                                        try {
+                                            const url = await uploadUserImage(file);
+                                            addImage(url);
+                                        } catch (error: any) {
+                                            alert(error.message || 'Failed to upload image');
+                                        } finally {
+                                            setIsUploading(false);
+                                        }
                                     }
+                                    // Reset input
+                                    e.target.value = '';
                                 }}
                             />
-                            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-                                <ImageIcon size={32} />
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${isUploading ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-600'}`}>
+                                {isUploading ? (
+                                    <Loader2 size={32} className="animate-spin" />
+                                ) : (
+                                    <ImageIcon size={32} />
+                                )}
                             </div>
                             <div className="text-center">
-                                <p className="font-bold text-gray-700">Click to Upload</p>
+                                <p className="font-bold text-gray-700">
+                                    {isUploading ? 'Uploading...' : 'Click to Upload'}
+                                </p>
                                 <p className="text-xs text-gray-400">JPG, PNG up to 5MB</p>
                             </div>
                         </div>

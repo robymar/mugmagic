@@ -29,14 +29,22 @@ export const CartDrawer = () => {
 
     if (!mounted) return null;
 
-    const handleApplyPromo = () => {
-        const success = applyDiscount(promoCode);
-        if (success) {
+    const [isValidating, setIsValidating] = useState(false);
+
+    const handleApplyPromo = async () => {
+        if (!promoCode) return;
+        setIsValidating(true);
+        setPromoError('');
+
+        const result = await applyDiscount(promoCode);
+
+        if (result.success) {
             setPromoCode('');
             setPromoError('');
         } else {
-            setPromoError('Invalid code');
+            setPromoError(result.message || 'Invalid code');
         }
+        setIsValidating(false);
     };
 
     const handleClearCart = () => {
@@ -177,10 +185,10 @@ export const CartDrawer = () => {
                                             />
                                             <button
                                                 onClick={handleApplyPromo}
-                                                disabled={!promoCode}
-                                                className="px-4 py-2 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                disabled={!promoCode || isValidating}
+                                                className="px-4 py-2 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[80px]"
                                             >
-                                                Apply
+                                                {isValidating ? '...' : 'Apply'}
                                             </button>
                                         </div>
                                     )}

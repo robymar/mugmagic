@@ -2,6 +2,47 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Product, ProductVariant } from '@/types/product';
 
+// Helper to debounce cart tracking
+let timeoutId: NodeJS.Timeout;
+
+const trackAbandonedCart = async (state: CartState) => {
+    if (typeof window === 'undefined') return;
+
+    // Don't track if empty (unless we want to clear it on backend, but let's just ignore for now)
+    // If we clear cart, maybe we should tell backend? 
+    // For now we just stop tracking empty carts.
+    if (state.items.length === 0) return;
+
+    // Clear previous timeout
+    clearTimeout(timeoutId);
+
+    // Debounce 2 seconds
+    timeoutId = setTimeout(async () => {
+        try {
+            let sessionId = localStorage.getItem('mugmagic_session_id');
+            if (!sessionId) {
+                sessionId = crypto.randomUUID();
+                localStorage.setItem('mugmagic_session_id', sessionId);
+            }
+
+            const payload = {
+                items: state.items,
+                total_amount: state.total(),
+                session_id: sessionId,
+            };
+
+            await fetch('/api/cart/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            // console.log('Cart tracked');
+        } catch (e) {
+            console.error('Failed to track cart', e);
+        }
+    }, 2000);
+};
+
 export interface CartItem {
     id: string;
     productId: string;
@@ -23,6 +64,11 @@ interface CartState {
     discountCode: string | null;
     discountAmount: number;
 
+    // Checkout reservation state
+    checkoutId: string | null;
+    reservationExpiresAt: Date | null;
+    isReservationActive: boolean;
+
     // Actions
     addItem: (item: CartItem) => void;
     updateItem: (id: string, updates: Partial<CartItem>) => void;
@@ -32,8 +78,13 @@ interface CartState {
     toggleCart: () => void;
     openCart: () => void;
     closeCart: () => void;
-    applyDiscount: (code: string) => boolean;
+    applyDiscount: (code: string) => Promise<{ success: boolean; message?: string }>;
     removeDiscount: () => void;
+
+    // Checkout reservation actions
+    setCheckoutReservation: (checkoutId: string, expiresAt: Date) => void;
+    clearCheckoutReservation: () => void;
+    isReservationExpired: () => boolean;
 
     // Computed
     subtotal: () => number;
@@ -43,13 +94,6 @@ interface CartState {
     itemCount: () => number;
 }
 
-// Mock discount codes (in production, validate on backend)
-const DISCOUNT_CODES: Record<string, { type: 'percentage' | 'fixed'; value: number }> = {
-    'FREESHIP': { type: 'fixed', value: 5 },
-    'WELCOME10': { type: 'percentage', value: 10 },
-    'SAVE20': { type: 'percentage', value: 20 },
-};
-
 export const useCartStore = create<CartState>()(
     persist(
         (set, get) => ({
@@ -57,17 +101,18 @@ export const useCartStore = create<CartState>()(
             isOpen: false,
             discountCode: null,
             discountAmount: 0,
+            checkoutId: null,
+            reservationExpiresAt: null,
+            isReservationActive: false,
 
             addItem: (item) => {
                 const items = get().items;
-                // Match by productId + variantId for uniqueness
                 const matchKey = `${item.productId}-${item.selectedVariant?.id || 'default'}`;
                 const existing = items.find(
                     (i) => `${i.productId}-${i.selectedVariant?.id || 'default'}` === matchKey
                 );
 
                 if (existing && !item.designId) {
-                    // If same product+variant without customization, increase quantity
                     set({
                         items: items.map((i) =>
                             `${i.productId}-${i.selectedVariant?.id || 'default'}` === matchKey
@@ -77,9 +122,9 @@ export const useCartStore = create<CartState>()(
                         isOpen: true,
                     });
                 } else {
-                    // New item or customized item (each design is unique)
                     set({ items: [...items, item], isOpen: true });
                 }
+                trackAbandonedCart(get());
             },
 
             updateItem: (id, updates) => {
@@ -88,10 +133,12 @@ export const useCartStore = create<CartState>()(
                         i.id === id ? { ...i, ...updates } : i
                     ),
                 });
+                trackAbandonedCart(get());
             },
 
             removeItem: (id) => {
                 set({ items: get().items.filter((i) => i.id !== id) });
+                trackAbandonedCart(get());
             },
 
             updateQuantity: (id, quantity) => {
@@ -104,9 +151,20 @@ export const useCartStore = create<CartState>()(
                         i.id === id ? { ...i, quantity } : i
                     ),
                 });
+                trackAbandonedCart(get());
             },
 
-            clearCart: () => set({ items: [], discountCode: null, discountAmount: 0 }),
+            clearCart: () => {
+                set({
+                    items: [],
+                    discountCode: null,
+                    discountAmount: 0,
+                    checkoutId: null,
+                    reservationExpiresAt: null,
+                    isReservationActive: false
+                });
+                // We could track empty cart here if we wanted to clear it on backend
+            },
 
             toggleCart: () => set({ isOpen: !get().isOpen }),
 
@@ -114,27 +172,40 @@ export const useCartStore = create<CartState>()(
 
             closeCart: () => set({ isOpen: false }),
 
-            applyDiscount: (code) => {
-                const upperCode = code.toUpperCase();
-                const discount = DISCOUNT_CODES[upperCode];
+            applyDiscount: async (code) => {
+                set({ discountCode: null, discountAmount: 0 });
 
-                if (!discount) return false;
+                try {
+                    const cartTotal = get().subtotal();
+                    const res = await fetch('/api/coupons/validate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code, cartTotal })
+                    });
 
-                const subtotal = get().subtotal();
-                let amount = 0;
+                    const data = await res.json();
 
-                if (discount.type === 'percentage') {
-                    amount = (subtotal * discount.value) / 100;
-                } else {
-                    amount = discount.value;
+                    if (!res.ok) {
+                        return { success: false, message: data.error };
+                    }
+
+                    if (data.success) {
+                        set({ discountCode: data.code, discountAmount: data.discountAmount });
+                        trackAbandonedCart(get()); // Track changes in total logic if we were sending discount info
+                        return { success: true };
+                    }
+
+                    return { success: false, message: 'Invalid coupon' };
+
+                } catch (error) {
+                    console.error('Coupon validation error', error);
+                    return { success: false, message: 'Network error' };
                 }
-
-                set({ discountCode: upperCode, discountAmount: amount });
-                return true;
             },
 
             removeDiscount: () => {
                 set({ discountCode: null, discountAmount: 0 });
+                trackAbandonedCart(get());
             },
 
             subtotal: () => {
@@ -145,12 +216,11 @@ export const useCartStore = create<CartState>()(
                 const subtotal = get().subtotal();
                 const discountCode = get().discountCode;
 
-                // Free shipping over €50 or with FREESHIP code
                 if (subtotal >= 50 || discountCode === 'FREESHIP') {
                     return 0;
                 }
 
-                return 5; // Standard shipping €5
+                return 5;
             },
 
             discount: () => {
@@ -167,6 +237,28 @@ export const useCartStore = create<CartState>()(
 
             itemCount: () => {
                 return get().items.reduce((count, item) => count + item.quantity, 0);
+            },
+
+            setCheckoutReservation: (checkoutId, expiresAt) => {
+                set({
+                    checkoutId,
+                    reservationExpiresAt: expiresAt,
+                    isReservationActive: true
+                });
+            },
+
+            clearCheckoutReservation: () => {
+                set({
+                    checkoutId: null,
+                    reservationExpiresAt: null,
+                    isReservationActive: false
+                });
+            },
+
+            isReservationExpired: () => {
+                const expiresAt = get().reservationExpiresAt;
+                if (!expiresAt) return true;
+                return new Date() > new Date(expiresAt);
             },
         }),
         {

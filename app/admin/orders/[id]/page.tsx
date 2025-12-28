@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Package, MapPin, CreditCard, User, Truck, Check, AlertCircle } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
+import { OrderTimeline } from '@/components/admin/OrderTimeline';
 
 async function updateOrderStatus(formData: FormData) {
     "use server";
@@ -128,8 +129,16 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                     </div>
                 </div>
 
+
+
                 {/* Right Column - Customer Info */}
                 <div className="space-y-6">
+                    {/* Visual Timeline */}
+                    <OrderTimeline
+                        status={order.payment_status}
+                        createdAt={order.created_at}
+                    />
+
                     {/* Customer */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">

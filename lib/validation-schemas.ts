@@ -69,6 +69,7 @@ export const cartItemSchema = z.object({
             name: z.string(),
         })
         .optional(),
+    customizationData: z.any().optional(), // Design data from editor
 });
 
 export const cartSchema = z.object({
@@ -126,7 +127,9 @@ export const createPaymentIntentSchema = z.object({
     items: z.array(cartItemSchema).min(1),
     shippingInfo: shippingInfoSchema,
     shippingMethod: shippingMethodSchema,
+    shippingMethodId: shippingMethodSchema.optional(), // Alias for compatibility
     userId: z.string().optional(),
+    checkout_id: z.string().optional(), // For stock reservation tracking
 });
 
 // ==========================================

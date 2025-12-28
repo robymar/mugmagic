@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { Product } from '@/types/product';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { cache } from '@/lib/cache';
 
 // Convert DB row to Product type
 function mapRowToProduct(row: any): Product {
@@ -18,6 +19,7 @@ function mapRowToProduct(row: any): Product {
         variants: row.variants,
         tags: row.tags,
         inStock: row.in_stock,
+        stockQuantity: row.stock_quantity,
         featured: row.featured,
         bestseller: row.bestseller,
         new: row.new,
@@ -27,6 +29,18 @@ function mapRowToProduct(row: any): Product {
 }
 
 export async function getProductsFromDB(page: number = 1, limit: number = 50, customClient?: SupabaseClient) {
+    // Generate cache key
+    const cacheKey = `products:page:${page}:limit:${limit}`;
+
+    // Try cache first (skip cache if custom client provided)
+    if (!customClient) {
+        const cached = cache.get<any>(cacheKey);
+        if (cached) {
+            console.log(`[Cache HIT] ${cacheKey}`);
+            return cached;
+        }
+    }
+
     const supabase = customClient ?? await createClient();
 
     // Calculate range
@@ -35,7 +49,7 @@ export async function getProductsFromDB(page: number = 1, limit: number = 50, cu
 
     const { data, error, count } = await supabase
         .from('products')
-        .select('*', { count: 'exact' })
+        .select('*, variants:product_variants(*)', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(from, to);
 
@@ -44,13 +58,21 @@ export async function getProductsFromDB(page: number = 1, limit: number = 50, cu
         return { products: [], total: 0 };
     }
 
-    return {
+    const result = {
         products: data.map(mapRowToProduct),
         total: count || 0,
         page,
         limit,
         totalPages: Math.ceil((count || 0) / limit)
     };
+
+    // Cache for 5 minutes
+    if (!customClient) {
+        cache.set(cacheKey, result, 300);
+        console.log(`[Cache SET] ${cacheKey}`);
+    }
+
+    return result;
 }
 
 export async function getProductBySlugFromDB(slug: string) {
@@ -87,6 +109,7 @@ export async function createProductInDB(product: Product) {
             variants: product.variants,
             tags: product.tags,
             in_stock: product.inStock,
+            stock_quantity: product.stockQuantity ?? 50,
             featured: product.featured,
             bestseller: product.bestseller,
             new: product.new,
@@ -107,6 +130,10 @@ export async function createProductInDB(product: Product) {
             console.error('Error details:', JSON.stringify(error, null, 2));
             throw error;
         }
+
+        // Invalidate products cache
+        cache.deletePattern('products:*');
+        console.log('Cache invalidated after product creation');
 
         console.log('Product created successfully:', data);
     } catch (err: any) {
@@ -149,6 +176,10 @@ export async function updateProductInDB(id: string, product: Partial<Product>) {
         console.error('Error updating product:', error);
         throw error;
     }
+
+    // Invalidate cache
+    cache.deletePattern('products:*');
+    console.log('Cache invalidated after product update');
 }
 
 export async function deleteProductInDB(id: string) {
@@ -162,4 +193,8 @@ export async function deleteProductInDB(id: string) {
         console.error('Error deleting product:', error);
         throw error;
     }
+
+    // Invalidate cache
+    cache.deletePattern('products:*');
+    console.log('Cache invalidated after product deletion');
 }

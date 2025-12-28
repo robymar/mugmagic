@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { logInfo, logError, logWarn } from '@/lib/logger';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { confirmReservations, releaseReservations } from '@/lib/stock-reservation';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2024-04-10',
@@ -83,6 +84,25 @@ export async function POST(req: Request) {
 }
 
 /**
+ * Helper to log to admin activity table
+ */
+async function logToAdmin(type: string, entityId: string, details: any, status: 'info' | 'warning' | 'error' | 'success' = 'info') {
+    try {
+        await supabaseAdmin.from('admin_activity_logs').insert({
+            action_type: 'payment',
+            entity_type: 'order',
+            entity_id: entityId,
+            details: {
+                ...details,
+                status
+            }
+        });
+    } catch (e) {
+        console.error('Failed to log to admin activity', e);
+    }
+}
+
+/**
  * Handle Stripe webhook events
  */
 async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
@@ -102,10 +122,10 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                 }
             });
 
-            // Retrieve order items associated with this payment intent
+            // Retrieve order associated with this payment intent
             const { data: orderData, error: orderError } = await supabaseAdmin
                 .from('orders')
-                .select('id')
+                .select('id, order_number') // Modified to include order_number
                 .eq('payment_intent_id', paymentIntent.id)
                 .single();
 
@@ -113,66 +133,73 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                 logError('Failed to retrieve order for payment intent', {
                     data: { error: orderError?.message, paymentIntentId: paymentIntent.id }
                 });
-                // Continue to update payment status even if items retrieval fails
             } else {
                 const orderId = orderData.id;
-                const { data: items, error: itemsError } = await supabaseAdmin
-                    .from('order_items')
-                    .select('product_id, quantity')
-                    .eq('order_id', orderId);
 
-                // ... (Inside payment_intent.succeeded)
+                // Log to admin activity table
+                await logToAdmin('payment', orderData.id, {
+                    event: 'payment_success',
+                    amount: paymentIntent.amount,
+                    order_number: orderData.order_number
+                }, 'success');
 
-                // CRITICAL: Decrement Stock Atomically
-                // This prevents race conditions where two users buy the last item
-                let allStockUpdatesSuccessful = true;
+                // Get checkout_id from payment intent metadata
+                const checkoutId = paymentIntent.metadata?.checkout_id;
 
-                if (itemsError) {
-                    logError('Failed to retrieve order items for order', {
-                        data: { error: itemsError.message, orderId: orderId }
-                    });
-                    allStockUpdatesSuccessful = false; // Can't update stock if we can't find items
-                } else if (items && items.length > 0) {
-                    for (const item of items) {
-                        const { data: stockSuccess, error: stockError } = await supabaseAdmin
-                            .rpc('decrement_stock', {
-                                row_id: item.product_id,
-                                quantity_to_subtract: item.quantity
-                            });
+                let finalStatus = 'paid';
 
-                        if (stockError) {
-                            logError('Failed to decrement stock (RPC Error)', {
-                                data: { productId: item.product_id, error: stockError.message }
-                            });
-                            allStockUpdatesSuccessful = false;
-                        } else if (!stockSuccess) {
-                            logError('Failed to decrement stock (Insufficient Stock)', {
-                                data: { productId: item.product_id, requested: item.quantity }
-                            });
-                            allStockUpdatesSuccessful = false;
-                        } else {
-                            logInfo('Stock decremented successfully', {
-                                data: { productId: item.product_id, quantity: item.quantity }
-                            });
-                        }
+                // CRITICAL: Confirm stock reservations if checkout_id exists
+                if (checkoutId && checkoutId !== 'no_checkout_id') {
+                    logInfo('Confirming stock reservations', { data: { checkoutId } });
+
+                    const reservationConfirmed = await confirmReservations(checkoutId);
+
+                    if (!reservationConfirmed) {
+                        logError('CRITICAL: Payment succeeded but reservation confirmation failed', {
+                            data: { paymentIntentId: paymentIntent.id, checkoutId }
+                        });
+                        finalStatus = 'stock_error';
+                    } else {
+                        logInfo('✅ Stock reservations confirmed and decremented', {
+                            data: { checkoutId }
+                        });
                     }
                 } else {
-                    logWarn('No order items found for order', {
-                        data: { orderId: orderId }
+                    // Fallback: Legacy stock decrement for orders without reservations
+                    logWarn('No checkout_id found, using legacy stock decrement', {
+                        data: { paymentIntentId: paymentIntent.id }
                     });
-                    // If no items, technically stock update didn't fail, but it's weird. 
-                    // We'll allow it to proceed to PAID if that's the business logic (e.g. donations), 
-                    // but for a shop, this might be an error. Assuming true for now.
-                }
-                // } -> End of else block for getting items
 
-                // Determine final status based on stock success
-                const finalStatus = allStockUpdatesSuccessful ? 'paid' : 'stock_error';
+                    const { data: items, error: itemsError } = await supabaseAdmin
+                        .from('order_items')
+                        .select('product_id, quantity')
+                        .eq('order_id', orderId);
 
-                if (!allStockUpdatesSuccessful) {
-                    logError('CRITICAL: Order paid but stock update failed. Manual review required.', {
-                        data: { paymentIntentId: paymentIntent.id, orderId: orderId }
-                    });
+                    let allStockUpdatesSuccessful = true;
+
+                    if (itemsError) {
+                        logError('Failed to retrieve order items', {
+                            data: { error: itemsError.message, orderId }
+                        });
+                        allStockUpdatesSuccessful = false;
+                    } else if (items && items.length > 0) {
+                        for (const item of items) {
+                            const { data: stockSuccess, error: stockError } = await supabaseAdmin
+                                .rpc('decrement_stock', {
+                                    row_id: item.product_id,
+                                    quantity_to_subtract: item.quantity
+                                });
+
+                            if (stockError || !stockSuccess) {
+                                logError('Failed to decrement stock', {
+                                    data: { productId: item.product_id, error: stockError?.message }
+                                });
+                                allStockUpdatesSuccessful = false;
+                            }
+                        }
+                    }
+
+                    finalStatus = allStockUpdatesSuccessful ? 'paid' : 'stock_error';
                 }
 
                 // Update order status
@@ -209,7 +236,28 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                 }
             });
 
+            // Release stock reservations if checkout_id exists
+            const checkoutId = paymentIntent.metadata?.checkout_id;
+            if (checkoutId && checkoutId !== 'no_checkout_id') {
+                logInfo('Releasing stock reservations for failed payment', { data: { checkoutId } });
+                await releaseReservations(checkoutId);
+            }
+
             // Update order status to 'failed'
+            const { data: orderData, error: orderError } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number')
+                .eq('payment_intent_id', paymentIntent.id)
+                .single();
+
+            if (orderData) {
+                await logToAdmin('payment', orderData.id, {
+                    event: 'payment_failed',
+                    reason: paymentIntent.last_payment_error?.message,
+                    order_number: orderData.order_number
+                }, 'error');
+            }
+
             const { error } = await supabaseAdmin
                 .from('orders')
                 .update({
@@ -264,6 +312,27 @@ async function handleWebhookEvent(event: Stripe.Event): Promise<NextResponse> {
                     canceledAt: paymentIntent.canceled_at
                 }
             });
+
+            // Release stock reservations
+            const checkoutId = paymentIntent.metadata?.checkout_id;
+            if (checkoutId && checkoutId !== 'no_checkout_id') {
+                logInfo('Releasing stock reservations for cancelled payment', { data: { checkoutId } });
+                await releaseReservations(checkoutId);
+            }
+
+            const { data: orderData, error: orderError } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number')
+                .eq('payment_intent_id', paymentIntent.id)
+                .single();
+
+            if (orderData) {
+                await logToAdmin('payment', orderData.id, {
+                    event: 'payment_canceled',
+                    canceledAt: paymentIntent.canceled_at,
+                    order_number: orderData.order_number
+                }, 'warning');
+            }
 
             break;
         }

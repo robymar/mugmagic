@@ -29,7 +29,7 @@ export async function validateRequest<T>(
                 error: NextResponse.json(
                     {
                         error: 'Validation failed',
-                        details: error.errors.map((e) => ({
+                        details: error.issues.map((e: any) => ({
                             field: e.path.join('.'),
                             message: e.message,
                             code: e.code,
@@ -99,7 +99,7 @@ export function validateQueryParams<T>(
                 error: NextResponse.json(
                     {
                         error: 'Invalid query parameters',
-                        details: error.errors.map((e) => ({
+                        details: error.issues.map((e: any) => ({
                             field: e.path.join('.'),
                             message: e.message,
                         })),
@@ -245,4 +245,47 @@ export async function requireAuth(request: Request, requiredRole?: string): Prom
         console.error('Auth check error:', error);
         return null;
     }
+}
+
+/**
+ * Generates a unique request ID for tracing
+ * @returns Unique request ID string
+ */
+export function generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Wraps an async API handler with error handling
+ * @param handler - The API handler function
+ * @returns Wrapped handler with automatic error handling
+ * 
+ * @example
+ * export const GET = withErrorHandler(async (request) => {
+ *   const data = await fetchData();
+ *   return successResponse(data);
+ * });
+ */
+export function withErrorHandler(
+    handler: (request: Request, context?: any) => Promise<NextResponse>
+) {
+    return async (request: Request, context?: any): Promise<NextResponse> => {
+        const requestId = generateRequestId();
+
+        try {
+            return await handler(request, context);
+        } catch (error: any) {
+            console.error(`[${requestId}] Unhandled error in API route:`, error);
+
+            return errorResponse(
+                'An unexpected error occurred',
+                500,
+                process.env.NODE_ENV === 'development' ? {
+                    message: error.message,
+                    stack: error.stack,
+                    requestId
+                } : { requestId }
+            );
+        }
+    };
 }

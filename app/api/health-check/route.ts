@@ -1,15 +1,48 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { createClient } from '@/utils/supabase/server';
+import { cache } from '@/lib/cache';
 
 export async function GET() {
-    console.log('🚑 [API Route] Health Check hit!');
+    const startTime = Date.now();
 
-    const cookieStore = await cookies();
-    cookieStore.set('health-check', 'ok', { secure: false, path: '/' });
+    try {
+        // Check database connectivity
+        const supabase = await createClient();
+        const { error: dbError } = await supabase
+            .from('products')
+            .select('id')
+            .limit(1);
 
-    return NextResponse.json({
-        status: 'ok',
-        message: 'Server is reachable',
-        cookiesReceived: cookieStore.getAll().map(c => c.name)
-    });
+        const dbStatus = dbError ? 'degraded' : 'healthy';
+        const responseTime = Date.now() - startTime;
+
+        // Get cache stats
+        const cacheStats = cache.getStats();
+
+        return NextResponse.json({
+            status: dbStatus === 'healthy' ? 'ok' : 'degraded',
+            timestamp: new Date().toISOString(),
+            responseTime: `${responseTime}ms`,
+            services: {
+                database: {
+                    status: dbStatus,
+                    ...(dbError && { error: dbError.message })
+                },
+                cache: {
+                    status: 'healthy',
+                    stats: cacheStats
+                }
+            },
+            environment: process.env.NODE_ENV || 'development'
+        });
+    } catch (error: any) {
+        const responseTime = Date.now() - startTime;
+
+        return NextResponse.json({
+            status: 'error',
+            timestamp: new Date().toISOString(),
+            responseTime: `${responseTime}ms`,
+            error: error.message
+        }, { status: 503 });
+    }
 }

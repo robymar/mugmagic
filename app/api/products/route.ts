@@ -142,6 +142,7 @@ export async function POST(request: Request) {
             variants: Array.isArray(sanitizedData.variants) ? sanitizedData.variants : [],
             tags: Array.isArray(sanitizedData.tags) ? sanitizedData.tags : [],
             inStock: sanitizedData.inStock ?? true,
+            stockQuantity: sanitizedData.stockQuantity ?? 50,
             featured: sanitizedData.featured ?? false,
             bestseller: sanitizedData.bestseller ?? false,
             new: sanitizedData.new ?? true,

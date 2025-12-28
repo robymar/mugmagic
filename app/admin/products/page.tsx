@@ -1,10 +1,9 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Pencil, Trash2, Search, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import { Product } from '@/types/product';
+import { VariantAccordion } from '@/components/admin/VariantAccordion';
 
 export default function AdminProductsPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -12,6 +11,7 @@ export default function AdminProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [categories, setCategories] = useState<any[]>([]);
+    const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchProducts();
@@ -56,6 +56,10 @@ export default function AdminProductsPage() {
         } catch (error) {
             console.error('Error deleting product:', error);
         }
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedProductId(expandedProductId === id ? null : id);
     };
 
     const filteredProducts = products.filter(product => {
@@ -112,7 +116,7 @@ export default function AdminProductsPage() {
                                 <th className="px-6 py-4 font-semibold text-gray-600">Product</th>
                                 <th className="px-6 py-4 font-semibold text-gray-600">Category</th>
                                 <th className="px-6 py-4 font-semibold text-gray-600">Price</th>
-                                <th className="px-6 py-4 font-semibold text-gray-600">Status</th>
+                                <th className="px-6 py-4 font-semibold text-gray-600">Stock</th>
                                 <th className="px-6 py-4 font-semibold text-gray-600 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -134,63 +138,91 @@ export default function AdminProductsPage() {
                                 </tr>
                             ) : (
                                 filteredProducts.map((product) => (
-                                    <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden relative">
-                                                    {product.images.thumbnail && (
-                                                        <Image
-                                                            src={product.images.thumbnail}
-                                                            alt={product.name}
-                                                            fill
-                                                            className="object-cover"
-                                                            sizes="48px"
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="font-semibold text-gray-900">{product.name}</div>
-                                                    <div className="text-sm text-gray-500">{product.slug}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="capitalize px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
-                                                {product.category}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium">
-                                            €{product.basePrice.toFixed(2)}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {product.inStock ? (
-                                                <span className="inline-flex items-center gap-1.5 text-green-600 text-sm font-medium">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
-                                                    In Stock
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 text-red-600 text-sm font-medium">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-                                                    Out of Stock
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Link href={`/admin/products/${product.id}`}>
-                                                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                                        <Pencil size={18} />
+                                    <React.Fragment key={product.id}>
+                                        <tr className={`hover:bg-gray-50 transition-colors ${expandedProductId === product.id ? 'bg-gray-50' : ''}`}>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-4">
+                                                    <button
+                                                        onClick={() => toggleExpand(product.id)}
+                                                        className="text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        {expandedProductId === product.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                                     </button>
-                                                </Link>
-                                                <button
-                                                    onClick={() => handleDelete(product.id)}
-                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                    <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden relative border border-gray-200">
+                                                        {product.images.thumbnail && (
+                                                            <Image
+                                                                src={product.images.thumbnail}
+                                                                alt={product.name}
+                                                                fill
+                                                                className="object-cover"
+                                                                sizes="48px"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold text-gray-900">{product.name}</div>
+                                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                            {product.slug}
+                                                            {product.variants && product.variants.length > 0 && (
+                                                                <span className="flex items-center gap-1 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                                                                    <Layers size={10} />
+                                                                    {product.variants.length}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="capitalize px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
+                                                    {product.category}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 font-medium font-mono">
+                                                €{product.basePrice.toFixed(2)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {product.inStock ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-green-600 text-sm font-medium">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                                                        In Stock
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 text-red-600 text-sm font-medium">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                                                        Out of Stock
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Link href={`/admin/products/${product.id}`}>
+                                                        <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                                            <Pencil size={18} />
+                                                        </button>
+                                                    </Link>
+                                                    <button
+                                                        onClick={() => handleDelete(product.id)}
+                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {expandedProductId === product.id && product.variants && (
+                                            <tr>
+                                                <td colSpan={5} className="p-0">
+                                                    <VariantAccordion
+                                                        variants={product.variants}
+                                                        productId={product.id}
+                                                        isOpen={true}
+                                                        onToggle={() => { }}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))
                             )}
                         </tbody>
@@ -200,3 +232,4 @@ export default function AdminProductsPage() {
         </div>
     );
 }
+
