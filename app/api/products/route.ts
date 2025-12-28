@@ -106,7 +106,11 @@ export async function POST(request: Request) {
         if (!validation.success) {
             console.error('Validation Error:', validation.error);
             return NextResponse.json(
-                { error: 'Validation failed', details: validation.error.issues },
+                {
+                    error: 'Validation failed',
+                    details: validation.error.issues,
+                    debug_dump: validation.error.format()
+                },
                 { status: 400 }
             );
         }
@@ -146,6 +150,7 @@ export async function POST(request: Request) {
             featured: sanitizedData.featured ?? false,
             bestseller: sanitizedData.bestseller ?? false,
             new: sanitizedData.new ?? true,
+            customizable: sanitizedData.customizable ?? true,
             rating: 0,
             reviewCount: 0
         };

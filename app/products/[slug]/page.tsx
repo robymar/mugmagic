@@ -6,6 +6,7 @@ import { ProductGallery } from '@/components/product/ProductGallery';
 import { ProductReviews } from '@/components/product/ProductReviews';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductVariantSelectorClient } from '@/components/product/ProductVariantSelectorClient';
+import { ProductPurchase } from '@/components/product/ProductPurchase';
 import { formatCurrency } from '@/lib/format';
 import {
     Star, ShoppingCart, Sparkles, Package, Shield, Truck,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { createClient } from '@supabase/supabase-js';
+import { Product } from '@/types/product';
 
 export async function generateStaticParams() {
     const supabase = createClient(
@@ -29,25 +31,21 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     const { slug } = await params;
 
     // Try database first, then fallback to local data
-    let product = await getProductBySlugFromDB(slug);
+    let product: Product | null = await getProductBySlugFromDB(slug);
 
     if (!product) {
         // Fallback to local products data
-        product = getProductBySlug(slug) || null;
+        product = (getProductBySlug(slug) as Product) || null;
     }
 
     if (!product) {
         notFound();
     }
 
-    // Calculate final price with default variant
-    const defaultVariant = product.variants?.[0];
-    const finalPrice = product.basePrice + (defaultVariant?.priceModifier || 0);
-
     // Get related products (same category, excluding current)
     const { products: allProducts } = await getProductsFromDB();
     const relatedProducts = allProducts
-        .filter(p => p.category === product.category && p.id !== product.id)
+        .filter(p => p.category === product!.category && p.id !== product!.id)
         .slice(0, 3);
 
     return (
@@ -113,7 +111,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                                             <Star
                                                 key={star}
                                                 size={20}
-                                                className={star <= Math.round(product.rating!) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+                                                className={star <= Math.round(product!.rating!) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
                                             />
                                         ))}
                                     </div>
@@ -124,22 +122,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                             )}
                         </div>
 
-                        {/* Price */}
-                        <div className="flex items-baseline gap-4">
-                            <div className="text-4xl font-black text-gray-900">
-                                {formatCurrency(product.basePrice)}
-                            </div>
-                            {product.compareAtPrice && (
-                                <>
-                                    <div className="text-2xl text-gray-400 line-through">
-                                        {formatCurrency(product.compareAtPrice)}
-                                    </div>
-                                    <div className="px-3 py-1 bg-red-100 text-red-700 font-bold rounded-lg">
-                                        Save {Math.round(((product.compareAtPrice - product.basePrice) / product.compareAtPrice) * 100)}%
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                        {/* Interactive Purchase Section (Price, Variants, Buttons) */}
+                        <ProductPurchase product={product} />
 
                         {/* Description */}
                         <div className="prose prose-gray">
@@ -147,13 +131,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                                 {product.longDescription || product.description}
                             </p>
                         </div>
-
-                        {/* Variant Selector */}
-                        {product.variants && product.variants.length > 0 && (
-                            <div className="border-t border-b border-gray-200 py-6">
-                                <ProductVariantSelectorClient variants={product.variants} />
-                            </div>
-                        )}
 
                         {/* Specifications Quick View */}
                         <div className="grid grid-cols-2 gap-4 py-6 border-t border-gray-200">
@@ -191,43 +168,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                             </div>
                         </div>
 
-                        {/* CTA Buttons */}
-                        <div className="space-y-3">
-                            <Link href={`/editor/${product.slug}`} className="block">
-                                <button className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-lg rounded-xl hover:shadow-2xl transition-all hover:scale-[1.02] active:scale-98 flex items-center justify-center gap-3">
-                                    <Sparkles size={24} />
-                                    Customize Your Design
-                                    <ChevronRight size={24} />
-                                </button>
-                            </Link>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <button className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
-                                    <Heart size={20} />
-                                    Save
-                                </button>
-                                <button className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
-                                    <Share2 size={20} />
-                                    Share
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Trust Badges */}
-                        <div className="bg-blue-50 rounded-xl p-4 space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-gray-700">
-                                <Check size={16} className="text-green-600" />
-                                Free shipping on orders over €50
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-700">
-                                <Check size={16} className="text-green-600" />
-                                30-day money-back guarantee
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-700">
-                                <Check size={16} className="text-green-600" />
-                                Premium print quality guaranteed
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -286,7 +226,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                         <div>
                             <h2 className="text-3xl font-black text-gray-900 mb-8">You May Also Like</h2>
                             <div className="grid md:grid-cols-3 gap-6">
-                                {relatedProducts.map((relatedProduct, index) => (
+                                {relatedProducts.map((relatedProduct: Product, index: number) => (
                                     <ProductCard key={relatedProduct.id} product={relatedProduct} index={index} />
                                 ))}
                             </div>

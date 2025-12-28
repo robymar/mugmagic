@@ -77,7 +77,7 @@ export async function PUT(
             success: true,
             message: 'Product updated successfully'
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Product Update Error:', error);
         return errorResponse('Failed to update product', 500);
     }

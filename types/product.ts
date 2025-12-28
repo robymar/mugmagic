@@ -89,6 +89,7 @@ export interface Product {
     new?: boolean;
     rating?: number;
     reviewCount?: number;
+    customizable?: boolean;
 }
 
 export interface CartProduct extends Product {

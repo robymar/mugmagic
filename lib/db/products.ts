@@ -24,7 +24,8 @@ function mapRowToProduct(row: any): Product {
         bestseller: row.bestseller,
         new: row.new,
         rating: row.rating,
-        reviewCount: row.review_count
+        reviewCount: row.review_count,
+        customizable: row.customizable
     };
 }
 
@@ -114,7 +115,8 @@ export async function createProductInDB(product: Product) {
             bestseller: product.bestseller,
             new: product.new,
             rating: product.rating,
-            review_count: product.reviewCount
+            review_count: product.reviewCount,
+            customizable: product.customizable ?? true
         };
 
         console.log('Attempting to insert product:', JSON.stringify(dbRow, null, 2));
@@ -148,24 +150,25 @@ export async function updateProductInDB(id: string, product: Partial<Product>) {
 
     // Convert Partial<Product> to DB columns
     const dbRow: any = {};
-    if (product.name) dbRow.name = product.name;
-    if (product.slug) dbRow.slug = product.slug;
-    if (product.description) dbRow.description = product.description;
-    if (product.longDescription) dbRow.long_description = product.longDescription;
-    if (product.category) dbRow.category = product.category;
-    if (product.basePrice) dbRow.base_price = product.basePrice;
-    if (product.compareAtPrice) dbRow.compare_at_price = product.compareAtPrice;
-    if (product.images) dbRow.images = product.images;
-    if (product.specifications) dbRow.specifications = product.specifications;
-    if (product.variants) dbRow.variants = product.variants;
-    if (product.tags) dbRow.tags = product.tags;
+    if (product.name !== undefined) dbRow.name = product.name;
+    if (product.slug !== undefined) dbRow.slug = product.slug;
+    if (product.description !== undefined) dbRow.description = product.description;
+    if (product.longDescription !== undefined) dbRow.long_description = product.longDescription;
+    if (product.category !== undefined) dbRow.category = product.category;
+    if (product.basePrice !== undefined) dbRow.base_price = product.basePrice;
+    if (product.compareAtPrice !== undefined) dbRow.compare_at_price = product.compareAtPrice;
+    if (product.images !== undefined) dbRow.images = product.images;
+    if (product.specifications !== undefined) dbRow.specifications = product.specifications;
+    if (product.variants !== undefined) dbRow.variants = product.variants;
+    if (product.tags !== undefined) dbRow.tags = product.tags;
     if (product.inStock !== undefined) dbRow.in_stock = product.inStock;
+    if (product.stockQuantity !== undefined) dbRow.stock_quantity = product.stockQuantity;
     if (product.featured !== undefined) dbRow.featured = product.featured;
     if (product.bestseller !== undefined) dbRow.bestseller = product.bestseller;
     if (product.new !== undefined) dbRow.new = product.new;
-    // Rating/reviews usually handled separately, but allow update if needed
-    if (product.rating) dbRow.rating = product.rating;
-    if (product.reviewCount) dbRow.review_count = product.reviewCount;
+    if (product.customizable !== undefined) dbRow.customizable = product.customizable;
+    if (product.rating !== undefined) dbRow.rating = product.rating;
+    if (product.reviewCount !== undefined) dbRow.review_count = product.reviewCount;
 
     const { error } = await supabase
         .from('products')

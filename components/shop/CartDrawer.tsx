@@ -11,6 +11,7 @@ export const CartDrawer = () => {
     const { items, isOpen, closeCart, clearCart, subtotal, shipping, discount, total, discountCode, applyDiscount, removeDiscount } = useCartStore();
     const [promoCode, setPromoCode] = useState('');
     const [promoError, setPromoError] = useState('');
+    const [isValidating, setIsValidating] = useState(false);
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
@@ -29,7 +30,6 @@ export const CartDrawer = () => {
 
     if (!mounted) return null;
 
-    const [isValidating, setIsValidating] = useState(false);
 
     const handleApplyPromo = async () => {
         if (!promoCode) return;

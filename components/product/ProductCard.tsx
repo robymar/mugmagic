@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Product } from '@/types/product';
-import { Star, ShoppingCart, Sparkles } from 'lucide-react';
+import { Star, ShoppingCart, Sparkles, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import WishlistButton from './WishlistButton';
 import { formatCurrency } from '@/lib/format';
@@ -121,7 +121,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
                                 <div
                                     key={variant.id}
                                     className="w-6 h-6 rounded-full border-2 border-gray-200 hover:border-gray-400 transition-colors cursor-pointer shadow-sm"
-                                    style={{ backgroundColor: variant.hexCode }}
+                                    style={{ backgroundColor: variant.attributes?.hexCode || '#000000' }}
                                     title={variant.name}
                                 />
                             ))}
@@ -153,12 +153,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, index = 0 }) 
                         </span>
                     </div>
 
-                    <Link href={`/editor/${product.slug}`}>
-                        <button className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-sm">
-                            Customize
-                            <ShoppingCart size={16} />
-                        </button>
-                    </Link>
+                    {product.customizable !== false ? (
+                        <Link href={`/editor/${product.slug}`}>
+                            <button className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-sm">
+                                Customize
+                                <Sparkles size={16} />
+                            </button>
+                        </Link>
+                    ) : (
+                        <Link href={`/products/${product.slug}`}>
+                            <button className="px-5 py-2.5 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-sm">
+                                Add to Cart
+                                <ShoppingCart size={16} />
+                            </button>
+                        </Link>
+                    )}
                 </div>
 
                 {/* Stock Status */}

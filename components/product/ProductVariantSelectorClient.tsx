@@ -16,6 +16,7 @@ export function ProductVariantSelectorClient({ variants }: ProductVariantSelecto
             variants={variants}
             selectedVariant={selectedVariant}
             onSelectVariant={setSelectedVariant}
+        // basePrice - we might need to pass this through or remove this component entirely
         />
     );
 }

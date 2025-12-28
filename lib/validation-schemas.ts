@@ -27,26 +27,24 @@ export const productVariantSchema = z.object({
     id: z.string(),
     name: z.string(),
     color: z.string().optional(),
-    hexCode: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
-    // Prevent extremely large negative numbers that could result in zero/negative total price
-    // Assuming a reasonable max discount, or simply flag suspicious inputs.
-    // For now, we allow negative for discounts but user input should be reasonable.
-    priceModifier: z.number().safe(),
+    hexCode: z.string().optional(), // Relaxed validation for now
+    priceModifier: z.number().optional().default(0),
 });
 
 export const productSchema = z.object({
     id: z.string().optional(),
     name: z.string().min(1).max(100),
     slug: z.string().max(100).optional().or(z.literal('')),
-    description: z.string().min(1).max(500),
+    description: z.string().max(500).optional().or(z.literal('')),
     longDescription: z.string().max(2000).optional(),
     category: z.string().min(1),
-    basePrice: z.number().positive(),
-    compareAtPrice: z.number().positive().optional(),
+    basePrice: z.number().min(0, "Price cannot be negative"),
+    compareAtPrice: z.number().min(0).optional().nullable(),
     inStock: z.boolean().default(true),
     featured: z.boolean().default(false),
     bestseller: z.boolean().default(false),
     new: z.boolean().default(false),
+    customizable: z.boolean().default(true).optional(),
     variants: z.array(productVariantSchema).optional(),
     images: z.object({
         thumbnail: z.string(),

@@ -27,6 +27,7 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
         featured: false,
         bestseller: false,
         new: true,
+        customizable: true,
         images: { thumbnail: '', gallery: [] },
         specifications: {
             capacity: '',
@@ -78,9 +79,15 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                 router.push('/admin/products');
                 router.refresh();
             } else {
-                const errorMsg = data.error || data.message || 'Failed to save product';
+                const errorMsg = data.error || 'Failed to save product';
                 console.error('Save error:', errorMsg, data);
-                alert(`Failed to save product: ${errorMsg}`);
+
+                let detailsMsg = '';
+                if (data.details && Array.isArray(data.details)) {
+                    detailsMsg = '\n' + data.details.map((d: any) => `• ${d.path ? d.path.join('.') : d.field}: ${d.message}`).join('\n');
+                }
+
+                alert(`Failed to save product: ${errorMsg}${detailsMsg}`);
             }
         } catch (error) {
             console.error('Error saving product:', error);
@@ -226,7 +233,7 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                                     type="number"
                                     step="0.01"
                                     className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    value={formData.compareAtPrice}
+                                    value={formData.compareAtPrice ?? ''}
                                     onChange={e => setFormData({
                                         ...formData,
                                         compareAtPrice: e.target.value ? parseFloat(e.target.value) : 0
@@ -324,6 +331,21 @@ export default function ProductForm({ initialData, isEdit = false }: ProductForm
                                     onChange={e => setFormData({ ...formData, new: e.target.checked })}
                                 />
                                 <span className="font-medium text-gray-700">New Arrival Tag</span>
+                            </label>
+
+                            <hr className="border-gray-200 my-2" />
+
+                            <label className="flex items-center gap-3 p-3 rounded-lg border border-blue-200 bg-blue-50 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                                    checked={formData.customizable ?? true} // Default to true
+                                    onChange={e => setFormData({ ...formData, customizable: e.target.checked })}
+                                />
+                                <div>
+                                    <span className="font-bold text-gray-900 block">Customizable</span>
+                                    <span className="text-xs text-blue-600">Opens in Editor when clicked</span>
+                                </div>
                             </label>
                         </div>
                     </div>
