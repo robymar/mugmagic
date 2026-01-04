@@ -202,9 +202,38 @@ export default function CheckoutPage() {
 
         try {
             // Prepare items for reservation (variant_id, quantity)
-            const reservationItems = items.map(item => ({
-                variant_id: item.selectedVariant?.id || item.productId,
-                quantity: item.quantity
+            // We need to ensure all items have valid variant UUIDs
+            const reservationItems = await Promise.all(items.map(async (item) => {
+                // If we have a selectedVariant with an ID, use it
+                if (item.selectedVariant?.id) {
+                    return {
+                        variant_id: item.selectedVariant.id,
+                        quantity: item.quantity
+                    };
+                }
+
+                // Otherwise, fetch the product's default variant from the API
+                try {
+                    const response = await fetch(`/api/products/${item.productId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch product variants');
+                    }
+                    const productData = await response.json();
+
+                    // Get the first available variant
+                    const firstVariant = productData.variants?.[0];
+                    if (!firstVariant?.id) {
+                        throw new Error(`No variants available for product ${item.product?.name || item.productId}`);
+                    }
+
+                    return {
+                        variant_id: firstVariant.id,
+                        quantity: item.quantity
+                    };
+                } catch (error) {
+                    console.error('Error fetching variant for product:', item.productId, error);
+                    throw new Error(`Could not get variant for ${item.product?.name || item.productId}`);
+                }
             }));
 
             const reservationResult = await initializeCheckout(reservationItems);
@@ -236,7 +265,7 @@ export default function CheckoutPage() {
                 body: JSON.stringify({
                     items,
                     shippingInfo,
-                    shippingMethod,
+                    shippingMethodId: shippingMethod,
                     checkout_id: reservationResult.data!.checkout_id,
                     userId: user?.id
                 }),
@@ -256,7 +285,7 @@ export default function CheckoutPage() {
         } catch (error) {
             console.error("Error in checkout flow:", error);
             toast.dismiss(loadingToast);
-            toast.error('An unexpected error occurred. Please try again.');
+            toast.error(error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.');
             clearCheckoutReservation();
         }
     };

@@ -4,8 +4,9 @@ import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
 import { productSchema } from '@/lib/validation-schemas';
 import { createClient } from '@/utils/supabase/server';
 import { sanitizeProductData } from '@/lib/sanitization';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
-// Rate limiting for product updates/deletes
+// Rate limiting for product mutations/deletes
 const productMutationAttempts = new Map<string, { count: number; resetTime: number }>();
 
 function checkProductMutationRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
@@ -31,6 +32,53 @@ function checkProductMutationRateLimit(ip: string): { allowed: boolean; resetTim
 
     attempt.count++;
     return { allowed: true };
+}
+
+/**
+ * GET /api/products/[id] - Get product with variants
+ * Public endpoint
+ */
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+
+        // Fetch product with variants from database
+        const { data: product, error: productError } = await supabaseAdmin
+            .from('products')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (productError) {
+            console.error('Error fetching product:', productError);
+            return errorResponse('Product not found', 404);
+        }
+
+        // Fetch variants for this product
+        const { data: variants, error: variantsError } = await supabaseAdmin
+            .from('product_variants')
+            .select('*')
+            .eq('product_id', id)
+            .eq('is_available', true)
+            .order('sort_order');
+
+        if (variantsError) {
+            console.error('Error fetching variants:', variantsError);
+            // Continue without variants rather than failing
+        }
+
+        return NextResponse.json({
+            ...product,
+            variants: variants || []
+        });
+
+    } catch (error: any) {
+        console.error('Get Product Error:', error);
+        return errorResponse('Failed to fetch product', 500);
+    }
 }
 
 /**

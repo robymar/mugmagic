@@ -124,7 +124,7 @@ export const shippingMethodSchema = z.enum(['standard', 'express', 'overnight'])
 export const createPaymentIntentSchema = z.object({
     items: z.array(cartItemSchema).min(1),
     shippingInfo: shippingInfoSchema,
-    shippingMethod: shippingMethodSchema,
+    shippingMethod: shippingMethodSchema.optional(),
     shippingMethodId: shippingMethodSchema.optional(), // Alias for compatibility
     userId: z.string().optional(),
     checkout_id: z.string().optional(), // For stock reservation tracking
