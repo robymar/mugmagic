@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Tazas Antigravity v3 (Ajustado)</title>
+    <script src="/libs/three.min.js"></script>
+    <script src="/libs/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+        }
+
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            width: 320px;
+            backdrop-filter: blur(8px);
+            border: 1px solid #444;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+            color: #4ade80;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            align-items: center;
+        }
+
+        .label {
+            color: #aaa;
+        }
+
+        .value {
+            font-weight: bold;
+            color: #fff;
+            font-family: monospace;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            background: #2a2a2a;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        select:hover {
+            border-color: #4ade80;
+        }
+
+        .highlight {
+            color: #facc15;
+        }
+
+        #export-btn {
+            margin-top: 15px;
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(to right, #2563eb, #1d4ed8);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+
+        #export-btn:active {
+            transform: scale(0.98);
+        }
+
+        .note {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="info-panel">
+        <h1>Configurador de Tazas v3</h1>
+        <select id="mug-selector">
+            <option value="standard">Taza Estándar 11oz</option>
+            <option value="latte12">Taza Latte 12oz (Cónica)</option>
+            <option value="latte17">Taza Latte 17oz (Alta)</option>
+            <option value="espresso">Taza Espresso 3oz</option>
+        </select>
+
+        <div id="specs">
+            <div class="data-row"><span class="label">Altura:</span><span class="value" id="val-height">--</span></div>
+            <div class="data-row"><span class="label">Diámetro Sup:</span><span class="value" id="val-dtop">--</span>
+            </div>
+            <div class="data-row"><span class="label">Diámetro Inf:</span><span class="value" id="val-dbot">--</span>
+            </div>
+            <div class="data-row"><span class="label">Escala Asa:</span><span class="value highlight"
+                    id="val-hscale">--</span></div>
+        </div>
+
+        <button id="export-btn" onclick="copyParams()">Copiar JSON para Antigravity</button>
+        <p class="note">Ajuste v3: Asas Latte reducidas y proporcionadas.</p>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURACIÓN DE ESCENA ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x222222);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 10, 40);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // --- 2. ILUMINACIÓN ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(10, 20, 10);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
+
+        const rimLight = new THREE.SpotLight(0x4ade80, 2);
+        rimLight.position.set(-20, 10, -10);
+        rimLight.lookAt(0, 0, 0);
+        scene.add(rimLight);
+
+        // --- 3. BASE DE DATOS AJUSTADA (ASAS MÁS PEQUEÑAS) ---
+        const MUG_DB = {
+            standard: {
+                name: "Estándar 11oz",
+                height: 9.5,
+                radiusTop: 4.1,
+                radiusBottom: 4.1,
+                handleRadius: 2.3,
+                handleThick: 0.6,
+                handleY: 0,
+                handleScaleY: 1.3,
+                area: "200 x 95 mm"
+            },
+            latte12: {
+                name: "Latte 12oz",
+                height: 10.2,
+                radiusTop: 4.4,
+                radiusBottom: 3.0,
+                // Reducido de 2.5 -> 1.7 (más compacta)
+                handleRadius: 1.7,
+                handleThick: 0.60,
+                handleY: 0.5, // Ligeramente más arriba
+                // Reducido de 1.6 -> 1.5
+                handleScaleY: 1.5,
+                area: "Cónica"
+            },
+            latte17: {
+                name: "Latte 17oz",
+                height: 15.0,
+                radiusTop: 4.5,
+                radiusBottom: 3.0,
+                // Reducido de 3.0 -> 2.1 (mucho más controlada)
+                handleRadius: 2.1,
+                handleThick: 0.65,
+                handleY: 1.5,
+                // Reducido de 1.8 -> 1.6
+                handleScaleY: 1.6,
+                area: "Cónica Grande"
+            },
+            espresso: {
+                name: "Espresso 3oz",
+                height: 5.5,
+                radiusTop: 3.0,
+                radiusBottom: 3.0,
+                handleRadius: 1.1,
+                handleThick: 0.4,
+                handleY: 0,
+                handleScaleY: 1.2,
+                area: "160 x 50 mm"
+            }
+        };
+
+        // Material
+        const ceramicMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            roughness: 0.15,
+            metalness: 0.05,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+            side: THREE.DoubleSide
+        });
+
+        let currentMugGroup = new THREE.Group();
+        scene.add(currentMugGroup);
+
+        // --- 4. GENERADOR ---
+        function generateMug(type) {
+            scene.remove(currentMugGroup);
+            currentMugGroup = new THREE.Group();
+
+            const data = MUG_DB[type];
+
+            // A. CUERPO
+            const bodyGeo = new THREE.CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, 64, 1, true);
+            const baseGeo = new THREE.CircleGeometry(data.radiusBottom, 64);
+            baseGeo.rotateX(Math.PI / 2);
+            baseGeo.translate(0, -data.height / 2, 0);
+
+            const bodyMesh = new THREE.Mesh(bodyGeo, ceramicMaterial);
+            const baseMesh = new THREE.Mesh(baseGeo, ceramicMaterial);
+
+            bodyMesh.castShadow = true;
+            bodyMesh.receiveShadow = true;
+
+            // B. ASA (TOROIDE MODIFICADO)
+            const handleGeo = new THREE.TorusGeometry(data.handleRadius, data.handleThick, 20, 60);
+            const handleMesh = new THREE.Mesh(handleGeo, ceramicMaterial);
+
+            // 1. ESCALADO 
+            handleMesh.scale.set(1, data.handleScaleY, 1);
+
+            // 2. POSICIONAMIENTO
+            const radiusAtHandle = data.radiusBottom + (data.radiusTop - data.radiusBottom) * 0.6; // Altura aprox de conexión
+
+            // Ajuste de "Enterrado"
+            const embedFactor = data.handleThick * 0.4; // Un poco más enterrado para fusión suave
+
+            // Calculamos posición X basándonos en el radio real del toroide YA ESCALADO no afecta X, solo Y.
+            // Pero el radio base afecta cuan lejos sale.
+            handleMesh.position.x = radiusAtHandle + (data.handleRadius * 0.85) - embedFactor;
+            handleMesh.position.y = data.handleY;
+
+            // Grupo contenedor
+            currentMugGroup.add(bodyMesh);
+            currentMugGroup.add(baseMesh);
+            currentMugGroup.add(handleMesh);
+
+            // Centrar
+            currentMugGroup.position.y = data.height / 2;
+            bodyMesh.position.y = 0;
+
+            scene.add(currentMugGroup);
+            updateUI(data);
+        }
+
+        function updateUI(data) {
+            document.getElementById('val-height').textContent = data.height + " cm";
+            document.getElementById('val-dtop').textContent = data.radiusTop * 2 + " cm";
+            document.getElementById('val-dbot').textContent = data.radiusBottom * 2 + " cm";
+            document.getElementById('val-hscale').textContent = "x" + data.handleScaleY;
+        }
+
+        function copyParams() {
+            const type = document.getElementById('mug-selector').value;
+            const json = JSON.stringify(MUG_DB[type], null, 2);
+
+            const textArea = document.createElement("textarea");
+            textArea.value = json;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                document.execCommand('copy');
+                alert("Nuevos parámetros copiados (Asas ajustadas).");
+            } catch (err) {
+                alert("Error al copiar.");
+            }
+            document.body.removeChild(textArea);
+        }
+
+        document.getElementById('mug-selector').addEventListener('change', (e) => generateMug(e.target.value));
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        generateMug('standard');
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+
+</html>

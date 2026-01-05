@@ -13,100 +13,99 @@ const DynamicProductMesh = ({ texture, mugColor, product }: { texture: THREE.Tex
     const meshRef = useRef<THREE.Mesh>(null);
     const category = product?.category || 'mug';
     const slug = product?.slug || '';
+    const specs = product?.specifications || {};
 
-    // PROFILE FACTORY: Returns points for LatheGeometry based on product type
+    // Helper to parse dimensions from specificiation strings (e.g. "96-98mm")
+    const parseDim = (val: string | undefined, defaultVal: number) => {
+        if (!val) return defaultVal;
+        const numbers = val.match(/\d+(\.\d+)?/g)?.map(Number);
+        if (!numbers || numbers.length === 0) return defaultVal;
+        const avg = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+        return avg * 0.025; // Scale: 1mm = 0.025 units
+    };
+
+    // PROFILE FACTORY: Returns points for LatheGeometry based on product specs or defaults
     const getProfile = () => {
         const points = [];
-        // Determine exact type from slug
         let type = category;
-        if (slug.includes('conical')) type = 'conical';
-        else if (slug.includes('travel')) type = 'travel';
-        else if (slug.includes('camping')) type = 'camping';
-        else if (slug.includes('bottle')) type = 'bottle';
+        if (slug.includes('conical')) type = 'conical'; // Deprecated check, stick to category or defaults
+        if (slug.includes('stein')) type = 'stein';
 
-        switch (type) {
-            case 'bottle':
-                // Water Bottle Profile
-                points.push(new THREE.Vector2(0, 0));      // Bottom center
-                points.push(new THREE.Vector2(0.6, 0));    // Base radius (narrower)
-                points.push(new THREE.Vector2(0.6, 2.5));  // Body top
-                points.push(new THREE.Vector2(0.4, 2.8));  // Shoulder
-                points.push(new THREE.Vector2(0.3, 3.2));  // Neck
-                points.push(new THREE.Vector2(0.32, 3.3)); // Lip
-                points.push(new THREE.Vector2(0.28, 3.2)); // Inner neck
-                points.push(new THREE.Vector2(0.58, 2.5)); // Inner wall
-                points.push(new THREE.Vector2(0.58, 0.1)); // Inner base
-                points.push(new THREE.Vector2(0, 0.1));    // Center inner
-                break;
+        // 1. Determine Dimensions
+        const height = parseDim(specs.height, 2.4);
 
-            case 'travel':
-                // Travel Mug Profile (Taller, tapered bottom)
-                points.push(new THREE.Vector2(0, 0));       // Bottom center
-                points.push(new THREE.Vector2(0.65, 0));    // Base radius (narrower than top)
-                points.push(new THREE.Vector2(0.85, 2.8));  // Top rim (taller)
-                points.push(new THREE.Vector2(0.8, 2.8));   // Inner Top
-                points.push(new THREE.Vector2(0.6, 0.1));   // Inner Base
-                points.push(new THREE.Vector2(0, 0.1));     // Center inner
-                break;
-
-            case 'camping':
-                // Enamel Camping Mug (Short, Wide, Rolled Rim)
-                points.push(new THREE.Vector2(0, 0));       // Bottom center
-                points.push(new THREE.Vector2(1.1, 0));     // Wide base
-                points.push(new THREE.Vector2(1.1, 1.8));   // Short body
-                points.push(new THREE.Vector2(1.2, 1.85));  // Rolled Rim Out
-                points.push(new THREE.Vector2(1.0, 1.85));  // Rolled Rim In
-                points.push(new THREE.Vector2(1.0, 0.1));   // Inner wall
-                points.push(new THREE.Vector2(0, 0.1));     // Center inner
-                break;
-
-            case 'conical':
-                // Conical Mug Profile (V-shape)
-                points.push(new THREE.Vector2(0, 0));      // Center bottom
-                points.push(new THREE.Vector2(0.7, 0));    // Narrow base
-                points.push(new THREE.Vector2(1.1, 2.4));  // Wide top
-                points.push(new THREE.Vector2(1.15, 2.5)); // Lip
-                points.push(new THREE.Vector2(1.05, 2.4)); // Inner top
-                points.push(new THREE.Vector2(0.68, 0.1)); // Inner base
-                points.push(new THREE.Vector2(0, 0.1));    // Center inner
-                break;
-
-            case 'plate':
-                // Plate/Tray Profile
-                points.push(new THREE.Vector2(0, 0));       // Center
-                points.push(new THREE.Vector2(2.5, 0));     // Outer edge
-                points.push(new THREE.Vector2(2.6, 0.2));   // Rim top
-                points.push(new THREE.Vector2(2.4, 0.2));   // Rim inner
-                points.push(new THREE.Vector2(0, 0.05));    // Center inner
-                break;
-
-            default:
-                // Standard Cylindrical Mug
-                points.push(new THREE.Vector2(0, 0));      // Center bottom
-                points.push(new THREE.Vector2(0.9, 0));    // Outer base
-                points.push(new THREE.Vector2(0.9, 0.1));  // Inner wall start
-                points.push(new THREE.Vector2(0.9, 2.4));  // Inner wall top
-                points.push(new THREE.Vector2(0.95, 2.5)); // Rounded lip
-                points.push(new THREE.Vector2(1.0, 2.4));  // Outer wall top
-                points.push(new THREE.Vector2(1.0, 0.1));  // Outer wall bottom
-                points.push(new THREE.Vector2(0.9, 0));    // Return to base
+        let radiusTop, radiusBottom;
+        if (specs.diameter) {
+            const r = parseDim(specs.diameter, 1.8) / 2;
+            radiusTop = r;
+            radiusBottom = r;
+        } else {
+            radiusTop = parseDim(specs.top_diameter, 1.8) / 2;
+            radiusBottom = parseDim(specs.bottom_diameter, 1.4) / 2;
         }
-        return points;
+
+        // 2. Build Profile Points based on Type
+        if (category === 'latte' || type === 'conical') {
+            // Conical Mug
+            points.push(new THREE.Vector2(0, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0));
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusTop + 0.05, height + 0.05)); // Lip
+            points.push(new THREE.Vector2(radiusTop - 0.05, height)); // Inner top
+            points.push(new THREE.Vector2(radiusBottom - 0.05, 0.1)); // Inner base
+            points.push(new THREE.Vector2(0, 0.1));
+        } else if (category === 'travel' || slug.includes('travel')) {
+            // Travel Mug (Tapered bottom)
+            const baseW = radiusBottom || radiusTop * 0.8;
+            points.push(new THREE.Vector2(0, 0));
+            points.push(new THREE.Vector2(baseW, 0));
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusTop - 0.05, height));
+            points.push(new THREE.Vector2(baseW - 0.05, 0.1));
+            points.push(new THREE.Vector2(0, 0.1));
+        } else if (category === 'metal' || slug.includes('camping')) {
+            // Camping Mug (Rolled Rim)
+            points.push(new THREE.Vector2(0, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0));
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusTop + 0.1, height + 0.05)); // Rolled rim out
+            points.push(new THREE.Vector2(radiusTop - 0.05, height + 0.05)); // Rolled rim in
+            points.push(new THREE.Vector2(radiusTop - 0.1, height));
+            points.push(new THREE.Vector2(radiusBottom - 0.1, 0.1));
+            points.push(new THREE.Vector2(0, 0.1));
+        } else if (category === 'glass' || type === 'stein') {
+            // Beer Stein (Thick walls, heavy base)
+            points.push(new THREE.Vector2(0, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0.4)); // Heavy base outer
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusTop - 0.05, height)); // Lip
+            points.push(new THREE.Vector2(radiusTop - 0.15, height - 0.1)); // Inner top
+            points.push(new THREE.Vector2(radiusBottom - 0.15, 0.4)); // Inner above base
+            points.push(new THREE.Vector2(radiusBottom - 0.15, 0.3)); // Inner base floor
+            points.push(new THREE.Vector2(0, 0.3));
+        } else {
+            // Standard Ceramic
+            points.push(new THREE.Vector2(0, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0));
+            points.push(new THREE.Vector2(radiusBottom, 0.1));
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusTop + 0.05, height + 0.05)); // Lip
+            points.push(new THREE.Vector2(radiusTop, height));
+            points.push(new THREE.Vector2(radiusBottom - 0.1, 0.1));
+            points.push(new THREE.Vector2(0, 0.1));
+        }
+
+        return { points, height, radiusTop, radiusBottom };
     };
+
+    const { points: profilePoints, height: mugHeight, radiusTop, radiusBottom } = useMemo(() => getProfile(), [category, slug, specs]);
 
     // GENERATE GEOMETRY WITH ADAPTIVE UVs
     const productGeometry = useMemo(() => {
-        const points = getProfile();
-        const geometry = new THREE.LatheGeometry(points, 64);
+        const geometry = new THREE.LatheGeometry(profilePoints, 64);
         const posAttribute = geometry.attributes.position;
         const uvAttribute = geometry.attributes.uv;
-
-        // Custom UV Mapping based on Shape
-        let type = category;
-        if (slug.includes('conical')) type = 'conical';
-        else if (slug.includes('travel')) type = 'travel';
-        else if (slug.includes('camping')) type = 'camping';
-        else if (slug.includes('bottle')) type = 'bottle';
 
         for (let i = 0; i < posAttribute.count; i++) {
             const x = posAttribute.getX(i);
@@ -117,46 +116,31 @@ const DynamicProductMesh = ({ texture, mugColor, product }: { texture: THREE.Tex
             let u = 0, v = 0;
             let isPrintable = false;
 
-            if (type === 'plate') {
-                // Plane mapping for plates (top view)
-                if (y > 0.04) {
-                    u = (x / 5) + 0.5;
-                    v = (z / 5) + 0.5;
-                    isPrintable = true;
-                }
-            } else {
-                // Cylindrical/Conical mapping (wrap around)
-                const isOuterWall = radius > 0.6; // Simplified check for all mug types
+            // Simplified Printable Area Logic based on height proportions
+            // Assume printable area is middle 85% of height and outer wall
+            const minY = mugHeight * 0.1;
+            const maxY = mugHeight * 0.95;
+            const minR = (radiusBottom + radiusTop) / 2 * 0.8; // Approx check for outer wall
 
-                // Adjust printable height range based on type
-                let minY = 0.1, maxY = 2.4;
-                if (type === 'bottle') { minY = 0.1; maxY = 2.5; }
-                if (type === 'travel') { minY = 0.1; maxY = 2.8; }
-                if (type === 'camping') { minY = 0.1; maxY = 1.8; }
+            if (radius > minR && y > minY && y < maxY) {
+                let angle = Math.atan2(z, x);
+                if (angle < 0) angle += 2 * Math.PI;
+                let u01 = 1 - (angle / (2 * Math.PI));
 
-                if (isOuterWall && y > minY && y < maxY) {
-                    let angle = Math.atan2(z, x);
-                    if (angle < 0) angle += 2 * Math.PI;
-                    let u01 = 1 - (angle / (2 * Math.PI));
+                // Coverage based on handle gap (approx 20% gap -> 80% coverage)
+                const coverage = 0.8;
+                const uStart = 0.5 - (coverage / 2);
+                u = (u01 - uStart) / coverage;
 
-                    // Coverage adjustment
-                    let coverage = 0.7958; // Standard Mug
-                    if (type === 'bottle' || type === 'travel') coverage = 0.9;
-                    if (type === 'camping') coverage = 0.85;
+                // Normalize V
+                v = (y - minY) / (maxY - minY);
 
-                    const uStart = 0.5 - (coverage / 2);
-                    u = (u01 - uStart) / coverage;
-
-                    // Normalize V based on height
-                    const height = maxY - minY - (type === 'camping' ? 0.05 : 0.25);
-                    v = (y - (minY + 0.05)) / height;
-
-                    isPrintable = true;
-                }
+                isPrintable = true;
             }
 
             if (isPrintable) {
-                uvAttribute.setXY(i, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
+                // Clamping to avoid texture repeating artifacts at edges
+                uvAttribute.setXY(i, Math.max(0.001, Math.min(0.999, u)), Math.max(0.001, Math.min(0.999, v)));
             } else {
                 uvAttribute.setXY(i, 0, 0);
             }
@@ -165,64 +149,161 @@ const DynamicProductMesh = ({ texture, mugColor, product }: { texture: THREE.Tex
         geometry.computeVertexNormals();
         uvAttribute.needsUpdate = true;
         return geometry;
-    }, [category, slug]);
+    }, [profilePoints, mugHeight, radiusTop, radiusBottom]);
 
-    // HANDLE GENERATION (Only for Mugs and Camping Mugs)
+    // HANDLE GENERATION (Ported from Blender Script & Tuned to v3 Proportions)
     const handleGeometry = useMemo(() => {
-        // Explicitly exclude handles for bottles and travel mugs
-        if (category !== 'mug' || slug.includes('bottle') || slug.includes('travel')) return null;
+        if (category === 'travel' || category === 'bottle') return null;
 
-        const isConical = slug.includes('conical');
-        const isCamping = slug.includes('camping');
+        const h = mugHeight;
+        const rOuter = radiusTop; // Approx outer radius at handle height
 
         let curve;
-        if (isCamping) {
-            // Small C-handle for Camping Mug
-            curve = new THREE.CatmullRomCurve3([
-                new THREE.Vector3(1.1, 1.4, 0),
-                new THREE.Vector3(1.5, 1.5, 0),
-                new THREE.Vector3(1.6, 1.0, 0),
-                new THREE.Vector3(1.5, 0.5, 0),
-                new THREE.Vector3(1.1, 0.6, 0)
-            ]);
-            return new THREE.TubeGeometry(curve, 32, 0.08, 16, false); // Thinner handle
-        } else {
-            // Standard Mug Handle
-            curve = new THREE.CatmullRomCurve3([
-                new THREE.Vector3(isConical ? 1.05 : 0.95, 2.0, 0),
-                new THREE.Vector3(1.6, 2.1, 0),
-                new THREE.Vector3(1.8, 1.25, 0),
-                new THREE.Vector3(1.6, 0.4, 0),
-                new THREE.Vector3(isConical ? 0.8 : 0.95, 0.5, 0)
-            ]);
-            return new THREE.TubeGeometry(curve, 32, 0.12, 16, false);
-        }
-    }, [category, slug]);
+        let tubeRadius = 0.12;
+        let scaleY = 1.0;
 
-    // DEBUG: Verify texture is loaded in 3D
-    useEffect(() => {
-        if (texture) {
-            console.log('✅ Textura cargada en 3D:', {
-                width: texture.image?.width,
-                height: texture.image?.height,
-                wrapS: texture.wrapS,
-                wrapT: texture.wrapT
-            });
+        // TUNING BASED ON V3 "COMPACT" VALIDATION
+        // Scale conversion: v3 units * 0.25 approx = viewer units.
+        // v3 Handle R 1.7 -> ~0.45 viewer units stickout.
+
+        if (category === 'metal' || slug.includes('camping')) {
+            // FLAT_STRIP (Enamel)
+            const yCenter = h * 0.55;
+            const stickOut = 0.45;
+
+            curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(rOuter + 0.05, yCenter + 0.25, 0), // Top join
+                new THREE.Vector3(rOuter + stickOut, yCenter + 0.35, 0), // Top out
+                new THREE.Vector3(rOuter + stickOut + 0.1, yCenter - 0.1, 0), // Bottom out
+                new THREE.Vector3(rOuter + 0.3, yCenter - 0.35, 0), // Bottom in
+                new THREE.Vector3(rOuter + 0.05, yCenter - 0.25, 0) // Bottom join
+            ]);
+            tubeRadius = 0.08;
+            scaleY = 0.8; // Flatten loop
+            // NOTE: Geometry.scale for strip effect happens later
         }
-    }, [texture]);
+        else if (category === 'latte' || slug.includes('conical')) {
+            // EAR_SHAPE (Latte) - COMPACT V3
+            // v3: Compact radius, Oval (ScaleY 1.5)
+            const yTop = h * 0.75;
+            const stickOut = 0.5; // Reduced from 0.9!
+
+            curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(rOuter * 0.95, yTop, 0),
+                new THREE.Vector3(rOuter + stickOut, yTop + 0.2, 0),
+                new THREE.Vector3(rOuter + stickOut + 0.15, yTop - 0.4, 0),
+                new THREE.Vector3(rOuter + stickOut * 0.6, yTop - 0.8, 0),
+                new THREE.Vector3(radiusBottom * 1.05, yTop - 1.1, 0)
+            ]);
+            tubeRadius = 0.11;
+            scaleY = 1.1; // Mild elongation for Ear
+        }
+        else if (category === 'glass' || slug.includes('stein')) {
+            // TRIGGER (Stein) - Robust
+            const yTop = h * 0.75;
+            const stickOut = 0.6; // Sturdier
+
+            curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(rOuter + 0.1, yTop, 0),
+                new THREE.Vector3(rOuter + stickOut, yTop + 0.1, 0),
+                new THREE.Vector3(rOuter + stickOut + 0.15, h * 0.5, 0),
+                new THREE.Vector3(rOuter + stickOut * 0.8, h * 0.25, 0),
+                new THREE.Vector3(radiusBottom + 0.15, h * 0.3, 0)
+            ]);
+            tubeRadius = 0.16;
+        }
+        else if (slug.includes('15oz')) {
+            // D_ELONGATED (15oz Grande) - V3 Tuned
+            // v3: ScaleY 1.6
+            const yCenter = h * 0.55;
+            const stickOut = 0.65; // Bigger mug, bigger handle
+
+            curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(rOuter, yCenter + 0.5, 0),
+                new THREE.Vector3(rOuter + stickOut, yCenter + 0.6, 0),
+                new THREE.Vector3(rOuter + stickOut + 0.1, yCenter - 0.5, 0),
+                new THREE.Vector3(rOuter + stickOut * 0.7, yCenter - 0.8, 0), // Taper in
+                new THREE.Vector3(rOuter, yCenter - 0.7, 0)
+            ]);
+            tubeRadius = 0.13;
+            scaleY = 1.2;
+        }
+        else {
+            // C_OVAL (Standard 11oz) - V3 Tuned
+            // v3: ScaleY 1.3, Radius 2.3 (~0.58)
+            const yCenter = h * 0.5;
+            const stickOut = 0.55;
+
+            curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(rOuter, yCenter + 0.35, 0),
+                new THREE.Vector3(rOuter + stickOut, yCenter + 0.45, 0),
+                new THREE.Vector3(rOuter + stickOut + 0.15, yCenter, 0),
+                new THREE.Vector3(rOuter + stickOut, yCenter - 0.45, 0),
+                new THREE.Vector3(rOuter, yCenter - 0.35, 0)
+            ]);
+            tubeRadius = 0.12;
+            scaleY = 1.15; // Match v3 1.3 feel
+        }
+
+        const geometry = new THREE.TubeGeometry(curve, 32, tubeRadius, 16, false);
+
+        // Apply scaling
+        if (category === 'metal') {
+            // Strip effect
+            geometry.scale(1, 0.3, 1);
+        } else if (scaleY !== 1) {
+            // General elongation
+            geometry.scale(1, scaleY, 1);
+        }
+
+        return geometry;
+    }, [category, slug, mugHeight, radiusTop, radiusBottom]);
+
+    // MATERIAL PROPS
+    const materialProps = useMemo(() => {
+        const mat = specs.material || 'Ceramic';
+        const isGlass = mat.toLowerCase().includes('glass') || category === 'glass';
+        const isEnamel = mat.toLowerCase().includes('enamel') || category === 'metal';
+
+        if (isGlass) {
+            return {
+                transmission: 0.95,
+                thickness: 2.0,
+                roughness: 0.2,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                ior: 1.5,
+                color: "#ffffff"
+            };
+        } else if (isEnamel) {
+            return {
+                roughness: 0.3, // Slightly rougher/uneven
+                metalness: 0.1,
+                clearcoat: 0.8,
+                clearcoatRoughness: 0.15,
+                color: mugColor
+            };
+        } else {
+            // Ceramic Standard
+            return {
+                roughness: 0.15,
+                metalness: 0.0,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.1,
+                color: mugColor
+            };
+        }
+    }, [specs, category, mugColor]);
 
     return (
-        <group position={[0, category === 'plate' ? -0.1 : -1.25, 0]}>
-            {/* BASE MUG - Color Only */}
+        <group position={[0, -mugHeight / 2, 0]}>
+            {/* BASE MUG */}
             <mesh geometry={productGeometry} receiveShadow castShadow>
                 <meshPhysicalMaterial
-                    color={mugColor}
-                    roughness={0.05}
-                    metalness={0.05}
-                    clearcoat={1.0}
-                    clearcoatRoughness={0.02}
+                    {...materialProps}
                     side={THREE.DoubleSide}
                     envMapIntensity={1.2}
+                    transparent={materialProps.transmission ? true : false}
                 />
             </mesh>
 
@@ -233,11 +314,11 @@ const DynamicProductMesh = ({ texture, mugColor, product }: { texture: THREE.Tex
                         map={texture}
                         color="#ffffff"
                         transparent={true}
-                        alphaTest={0.01}  // CHANGED: 0.05 -> 0.01 for better transparency
-                        roughness={0.3}
+                        alphaTest={0.01}
+                        roughness={0.2}
                         metalness={0.0}
                         side={THREE.DoubleSide}
-                        depthWrite={false}
+                        depthWrite={!materialProps.transmission} // Write depth unless glass
                         polygonOffset={true}
                         polygonOffsetFactor={-1}
                         polygonOffsetUnits={-1}
@@ -248,12 +329,9 @@ const DynamicProductMesh = ({ texture, mugColor, product }: { texture: THREE.Tex
             {handleGeometry && (
                 <mesh geometry={handleGeometry} receiveShadow castShadow>
                     <meshPhysicalMaterial
-                        color={mugColor}
-                        roughness={0.05}
-                        metalness={0.05}
-                        clearcoat={1.0}
-                        clearcoatRoughness={0.02}
+                        {...materialProps}
                         envMapIntensity={1.2}
+                        transparent={materialProps.transmission ? true : false}
                     />
                 </mesh>
             )}
