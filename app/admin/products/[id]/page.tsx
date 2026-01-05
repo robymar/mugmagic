@@ -7,7 +7,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
     // getProductsFromDB returns { products: [...], total: number }
     const { products } = await getProductsFromDB();
-    const product = products.find(p => p.id === id);
+    const product = products.find((p: any) => p.id === id);
 
     if (!product) {
         notFound();

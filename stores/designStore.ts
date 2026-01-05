@@ -23,6 +23,10 @@ interface DesignState {
     designName: string;
     setDesignName: (name: string) => void;
 
+    // Product context
+    product: any | null;
+    setProduct: (product: any) => void;
+
     // DB Actions
     saveDesign: (productId: string, userId?: string) => Promise<string | null>; // Returns design ID
     loadDesign: (designId: string) => Promise<void>;
@@ -31,6 +35,8 @@ interface DesignState {
 export const useDesignStore = create<DesignState>((set, get) => ({
     canvas: null,
     mugColor: '#ffffff', // Default white
+    product: null,
+    setProduct: (product) => set({ product }),
     setMugColor: (color) => set({ mugColor: color }),
     setCanvas: (canvas) => {
         const prevCanvas = get().canvas;

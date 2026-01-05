@@ -63,7 +63,7 @@ export const CartItem: React.FC<CartItemProps> = ({ item }) => {
                             <div className="flex items-center gap-2 mt-1">
                                 <div
                                     className="w-4 h-4 rounded-full border border-gray-300"
-                                    style={{ backgroundColor: item.selectedVariant.hexCode }}
+                                    style={{ backgroundColor: item.selectedVariant.attributes?.hexCode || '#000000' }}
                                     title={item.selectedVariant.name}
                                 />
                                 <span className="text-sm text-gray-600">

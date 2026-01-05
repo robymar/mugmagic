@@ -48,6 +48,7 @@ export async function POST(req: Request) {
         // Validate request
         const { data, error: validationError } = await validateRequest(req, trackOrderSchema);
         if (validationError) return validationError;
+        if (!data) return errorResponse('Invalid request data', 400);
 
         const { orderNumber, email } = data;
 

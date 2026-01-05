@@ -5,10 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const { searchParams } = new URL(request.url);
         const emailParam = searchParams.get('email');
         const isGuest = id.startsWith('guest-') || (emailParam && emailParam.length > 0);

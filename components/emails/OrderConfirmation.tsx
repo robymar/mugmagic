@@ -1,12 +1,20 @@
-import { CartItem } from '@/stores/cartStore';
+// Simplified type for email generation (avoid full CartItem dependency)
+interface OrderItem {
+    id: string;
+    name: string;
+    quantity: number;
+    price: number;
+    variant?: string;
+}
 
 interface OrderEmailProps {
     orderNumber: string;
-    items: CartItem[];
+    items: OrderItem[];
     total: number;
     shippingInfo: {
-        firstName: string;
-        lastName: string;
+        firstName?: string;
+        lastName?: string;
+        name?: string;
         address: string;
         city: string;
         country: string;
@@ -16,10 +24,13 @@ interface OrderEmailProps {
 export function generateOrderEmailHtml({ orderNumber, items, total, shippingInfo }: OrderEmailProps) {
     const itemsList = items.map(item => `
         <div style="border-bottom: 1px solid #eee; padding: 10px 0;">
-            <p style="margin: 0; font-weight: bold;">${item.product.name} ${item.selectedVariant ? `(${item.selectedVariant.name})` : ''}</p>
+            <p style="margin: 0; font-weight: bold;">${item.name}${item.variant ? ` (${item.variant})` : ''}</p>
             <p style="margin: 0; color: #666;">Qty: ${item.quantity} x €${item.price.toFixed(2)}</p>
         </div>
     `).join('');
+
+    const firstName = shippingInfo.firstName || shippingInfo.name?.split(' ')[0] || 'Customer';
+    const lastName = shippingInfo.lastName || shippingInfo.name?.split(' ').slice(1).join(' ') || '';
 
     return `
         <!DOCTYPE html>
@@ -31,7 +42,7 @@ export function generateOrderEmailHtml({ orderNumber, items, total, shippingInfo
         <body style="font-family: sans-serif; line-height: 1.5; color: #333;">
             <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                 <h1 style="color: #2563eb;">Thank you for your order!</h1>
-                <p>Hi ${shippingInfo.firstName},</p>
+                <p>Hi ${firstName},</p>
                 <p>We're getting your order ready to be shipped. We will notify you when it has been sent.</p>
                 
                 <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -45,7 +56,7 @@ export function generateOrderEmailHtml({ orderNumber, items, total, shippingInfo
                 <div style="margin-top: 20px;">
                     <h3 style="font-size: 16px;">Shipping Address</h3>
                     <p style="color: #666;">
-                        ${shippingInfo.firstName} ${shippingInfo.lastName}<br>
+                        ${firstName} ${lastName}<br>
                         ${shippingInfo.address}<br>
                         ${shippingInfo.city}, ${shippingInfo.country}
                     </p>

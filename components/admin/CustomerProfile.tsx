@@ -141,7 +141,7 @@ export function CustomerProfile({ customer, orders }: CustomerProfileProps) {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <StatusBadge status={order.payment_status} size="sm" />
+                                            <StatusBadge status={order.payment_status} />
                                         </td>
                                         <td className="px-6 py-4 text-right font-mono font-medium">
                                             €{order.total_amount.toFixed(2)}

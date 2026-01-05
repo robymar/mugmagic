@@ -6,6 +6,7 @@ import ProductViewer3DWrapper from '@/components/viewer/ProductViewer3DWrapper';
 import { QualitySettings } from '@/components/editor/QualitySettings';
 import { Box, Monitor, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useDesignStore } from '@/stores/designStore';
 
 export const Stage = () => {
     const [viewMode, setViewMode] = useState<'3d' | '2d'>('2d'); // Default to 2D for editing ease, user can toggle
@@ -27,7 +28,14 @@ export const Stage = () => {
                     <Monitor size={16} /> Design
                 </button>
                 <button
-                    onClick={() => setViewMode('3d')}
+                    onClick={() => {
+                        setViewMode('3d');
+                        // FORCE TEXTURE UPDATE ON SWITCH
+                        const canvas = useDesignStore.getState().canvas;
+                        if (canvas) {
+                            canvas.fire('object:modified'); // Trigger texture update listener
+                        }
+                    }}
                     className={`
                         px-6 py-2 rounded-full text-sm font-bold flex items-center gap-2 transition-all
                         ${viewMode === '3d'

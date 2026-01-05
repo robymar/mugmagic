@@ -10,9 +10,7 @@ import { supabaseAdmin } from './supabase-admin';
 import { logInfo, logWarn, logError } from './logger';
 
 interface IdempotencyResult {
-    isD
-
-    uplicate: boolean;
+    isDuplicate: boolean;
     cachedResponse?: {
         data: any;
         statusCode: number;
@@ -121,16 +119,16 @@ export function generateIdempotencyKey(userId: string, data: any): string {
 }
 
 /**
- * Simple hash function for strings
+ * Cryptographically secure hash function for strings
+ * Uses SHA-256 to prevent collisions
  */
 function hashString(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(36);
+    const crypto = require('crypto');
+    return crypto
+        .createHash('sha256')
+        .update(str)
+        .digest('base64url')
+        .substring(0, 32); // First 32 characters for brevity
 }
 
 /**

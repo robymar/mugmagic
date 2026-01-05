@@ -22,7 +22,7 @@ export async function generateStaticParams() {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
     const { products } = await getProductsFromDB(1, 100, supabase);
-    return products.map((product) => ({
+    return products.map((product: any) => ({
         slug: product.slug,
     }));
 }
@@ -45,7 +45,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     // Get related products (same category, excluding current)
     const { products: allProducts } = await getProductsFromDB();
     const relatedProducts = allProducts
-        .filter(p => p.category === product!.category && p.id !== product!.id)
+        .filter((p: any) => p.category === product!.category && p.id !== product!.id)
         .slice(0, 3);
 
     return (
@@ -178,36 +178,44 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                         <h2 className="text-3xl font-black text-gray-900 mb-8">Specifications</h2>
                         <div className="bg-gray-50 rounded-2xl p-8">
                             <dl className="grid md:grid-cols-2 gap-6">
-                                {product.specifications.capacity && (
+                                {product.specifications?.capacity && (
                                     <div className="flex justify-between border-b border-gray-200 pb-4">
                                         <dt className="font-semibold text-gray-700">Capacity</dt>
                                         <dd className="text-gray-900">{product.specifications.capacity}</dd>
                                     </div>
                                 )}
-                                <div className="flex justify-between border-b border-gray-200 pb-4">
-                                    <dt className="font-semibold text-gray-700">Material</dt>
-                                    <dd className="text-gray-900">{product.specifications.material}</dd>
-                                </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-4">
-                                    <dt className="font-semibold text-gray-700">Dimensions</dt>
-                                    <dd className="text-gray-900">
-                                        {product.specifications.dimensions.height}mm (H) × {product.specifications.dimensions.diameter}mm (Ø)
-                                    </dd>
-                                </div>
-                                {product.specifications.weight && (
+                                {product.specifications?.material && (
+                                    <div className="flex justify-between border-b border-gray-200 pb-4">
+                                        <dt className="font-semibold text-gray-700">Material</dt>
+                                        <dd className="text-gray-900">{product.specifications.material}</dd>
+                                    </div>
+                                )}
+                                {product.specifications?.dimensions && (
+                                    <div className="flex justify-between border-b border-gray-200 pb-4">
+                                        <dt className="font-semibold text-gray-700">Dimensions</dt>
+                                        <dd className="text-gray-900">
+                                            {product.specifications.dimensions.height}mm (H) × {product.specifications.dimensions.diameter}mm (Ø)
+                                        </dd>
+                                    </div>
+                                )}
+                                {product.specifications?.weight && (
                                     <div className="flex justify-between border-b border-gray-200 pb-4">
                                         <dt className="font-semibold text-gray-700">Weight</dt>
                                         <dd className="text-gray-900">{product.specifications.weight}</dd>
                                     </div>
                                 )}
-                                <div className="flex justify-between border-b border-gray-200 pb-4">
-                                    <dt className="font-semibold text-gray-700">Dishwasher Safe</dt>
-                                    <dd className="text-gray-900">{product.specifications.dishwasherSafe ? 'Yes' : 'No'}</dd>
-                                </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-4">
-                                    <dt className="font-semibold text-gray-700">Microwave Safe</dt>
-                                    <dd className="text-gray-900">{product.specifications.microwaveSafe ? 'Yes' : 'No'}</dd>
-                                </div>
+                                {product.specifications?.dishwasherSafe !== undefined && (
+                                    <div className="flex justify-between border-b border-gray-200 pb-4">
+                                        <dt className="font-semibold text-gray-700">Dishwasher Safe</dt>
+                                        <dd className="text-gray-900">{product.specifications.dishwasherSafe ? 'Yes' : 'No'}</dd>
+                                    </div>
+                                )}
+                                {product.specifications?.microwaveSafe !== undefined && (
+                                    <div className="flex justify-between border-b border-gray-200 pb-4">
+                                        <dt className="font-semibold text-gray-700">Microwave Safe</dt>
+                                        <dd className="text-gray-900">{product.specifications.microwaveSafe ? 'Yes' : 'No'}</dd>
+                                    </div>
+                                )}
                             </dl>
                         </div>
                     </div>

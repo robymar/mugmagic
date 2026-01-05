@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodSchema, ZodError } from 'zod';
+import { randomUUID } from 'crypto';
 
 /**
  * Validates request body against a Zod schema.
@@ -252,7 +253,7 @@ export async function requireAuth(request: Request, requiredRole?: string): Prom
  * @returns Unique request ID string
  */
 export function generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `req_${randomUUID()}`;
 }
 
 /**

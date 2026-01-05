@@ -29,14 +29,14 @@ function TimelineStep({ status, icon: Icon, title, description, timestamp, isLas
             {/* Icon */}
             <div
                 className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center border-2 flex-shrink-0 transition-colors ${status === 'completed' ? 'bg-blue-600 border-blue-600 text-white' :
-                        status === 'current' ? 'bg-white border-blue-600 text-blue-600 animate-pulse' :
-                            status === 'error' ? 'bg-red-100 border-red-500 text-red-600' :
-                                'bg-white border-gray-200 text-gray-400'
+                    status === 'current' ? 'bg-white border-blue-600 text-blue-600 animate-pulse' :
+                        status === 'error' ? 'bg-red-100 border-red-500 text-red-600' :
+                            'bg-white border-gray-200 text-gray-400'
                     }`}
             >
                 {status === 'completed' ? <Check size={18} /> :
                     status === 'error' ? <AlertCircle size={18} /> :
-                        <Icon size={18} />}
+                        React.createElement(Icon, { size: 18 })}
             </div>
 
             {/* Content */}

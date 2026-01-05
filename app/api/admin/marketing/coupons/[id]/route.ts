@@ -5,13 +5,14 @@ export const dynamic = 'force-dynamic';
 
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const { error } = await supabaseAdmin
             .from('coupons')
             .delete()
-            .eq('id', params.id);
+            .eq('id', id);
 
         if (error) throw error;
 
@@ -23,15 +24,16 @@ export async function DELETE(
 
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const body = await request.json();
 
         const { error } = await supabaseAdmin
             .from('coupons')
             .update(body)
-            .eq('id', params.id);
+            .eq('id', id);
 
         if (error) throw error;
 

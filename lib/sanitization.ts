@@ -16,18 +16,48 @@
  * const safe = sanitizeHtml(userInput); // Returns: 'Hello'
  */
 export function sanitizeHtml(dirty: string): string {
-    // For now, use a basic sanitization approach
+    // Enhanced sanitization (TEMPORARY - replace with DOMPurify when possible)
     // TODO: Install isomorphic-dompurify for production use
     // import DOMPurify from 'isomorphic-dompurify';
     // return DOMPurify.sanitize(dirty);
 
-    // Basic sanitization (TEMPORARY - replace with DOMPurify)
-    return dirty
+    if (!dirty || typeof dirty !== 'string') {
+        return '';
+    }
+
+    // Step 1: Remove all HTML tags and their content
+    let sanitized = dirty;
+
+    // Remove script tags and their content
+    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+    // Remove style tags and their content
+    sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+    // Remove iframe tags
+    sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+
+    // Remove object, embed, and applet tags
+    sanitized = sanitized.replace(/<(object|embed|applet)\b[^<]*(?:(?!<\/\1>)<[^<]*)*<\/\1>/gi, '');
+
+    // Remove event handlers (onclick, onerror, onload, etc.)
+    sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+    sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
+
+    // Remove javascript: and data: URIs
+    sanitized = sanitized.replace(/javascript:/gi, '');
+    sanitized = sanitized.replace(/data:text\/html/gi, '');
+
+    // Escape HTML special characters
+    sanitized = sanitized
+        .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#x27;')
         .replace(/\//g, '&#x2F;');
+
+    return sanitized;
 }
 
 /**

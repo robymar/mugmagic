@@ -61,6 +61,7 @@ export async function POST(request: Request) {
         // Validate request body
         const { data, error: validationError } = await validateRequest(request, loginSchema);
         if (validationError) return validationError;
+        if (!data) return errorResponse('Invalid request data', 400);
 
         const { email, password } = data;
 

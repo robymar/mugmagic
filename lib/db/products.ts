@@ -85,7 +85,11 @@ export async function getProductBySlugFromDB(slug: string) {
         .single();
 
     if (error) {
-        console.error('Error fetching product by slug:', error);
+        if (error.code === 'PGRST116') {
+            // Product not found in DB, return null to handle fallback
+            return null;
+        }
+        console.error('Error fetching product by slug:', JSON.stringify(error, null, 2));
         return null;
     }
 

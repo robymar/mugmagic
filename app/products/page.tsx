@@ -5,8 +5,8 @@ import Link from 'next/link';
 
 export default async function ProductsPage() {
     const { products: allProducts } = await getProductsFromDB();
-    const featuredProducts = allProducts.filter(p => p.featured);
-    const bestsellers = allProducts.filter(p => p.bestseller);
+    const featuredProducts = allProducts.filter((p: any) => p.featured);
+    const bestsellers = allProducts.filter((p: any) => p.bestseller);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">

@@ -11,6 +11,8 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createBulkReservations, getAvailableStock } from '@/lib/stock-reservation';
 import { getVariantById } from '@/lib/db/variants';
 import { validateRequest, errorResponse, successResponse, requireAuth } from '@/lib/api-utils';
@@ -30,8 +32,9 @@ export async function POST(request: Request) {
         // Validate request
         const { data, error: validationError } = await validateRequest(request, checkoutInitSchema);
         if (validationError) return validationError;
+        if (!data) return errorResponse('Invalid request data', 400);
 
-        const { items, user_id } = data!;
+        const { items, user_id } = data;
 
         logInfo('Checkout initialization started', {
             data: { itemCount: items.length, userId: user_id }
@@ -58,8 +61,7 @@ export async function POST(request: Request) {
             // Check available stock (physical - existing reservations)
             const availableStock = await getAvailableStock(item.variant_id);
 
-            // Bypass stock check for testing
-            /*
+            // SECURITY: Validate stock to prevent overselling
             if (availableStock < item.quantity) {
                 validationErrors.push(
                     `Insufficient stock for ${variant.name}. ` +
@@ -67,7 +69,6 @@ export async function POST(request: Request) {
                 );
                 continue;
             }
-            */
 
             validatedItems.push({ variant, quantity: item.quantity });
         }
@@ -79,8 +80,8 @@ export async function POST(request: Request) {
             });
         }
 
-        // Generate unique checkout ID
-        const checkoutId = `chk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Generate unique checkout ID using cryptographically secure random
+        const checkoutId = `chk_${randomUUID()}`;
 
         // MOCK RESERVATION FOR TESTING - BYPASS DB ERROR
         /*

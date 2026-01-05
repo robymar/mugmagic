@@ -59,7 +59,11 @@ export function useCanvasTexture(fabricCanvas: fabric.Canvas | null) {
                             loadedTexture.magFilter = THREE.LinearFilter;
                             loadedTexture.generateMipmaps = false;
 
-                            // CORREGIDO: Cambiar a ClampToEdgeWrapping para evitar repetición
+                            // FIX: Texture orientation
+                            loadedTexture.center.set(0.5, 0.5);
+                            loadedTexture.rotation = Math.PI; // Flip 180 degrees
+                            loadedTexture.flipY = false;
+
                             loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
                             loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
 
@@ -110,7 +114,11 @@ export function useCanvasTexture(fabricCanvas: fabric.Canvas | null) {
                     loadedTexture.magFilter = THREE.LinearFilter;
                     loadedTexture.generateMipmaps = false;
 
-                    // CORREGIDO: Igual que arriba
+                    // FIX: Texture orientation
+                    loadedTexture.center.set(0.5, 0.5);
+                    loadedTexture.rotation = Math.PI; // Flip 180 degrees
+                    loadedTexture.flipY = false; // Disable default flipY since we rotate
+
                     loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
                     loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
 

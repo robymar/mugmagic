@@ -115,6 +115,7 @@ export async function PUT(
         // Validate request
         const { data, error: validationError } = await validateRequest(request, productSchema);
         if (validationError) return validationError;
+        if (!data) return errorResponse('Invalid request data', 400);
 
         // Sanitize product data
         const sanitizedData = sanitizeProductData(data);

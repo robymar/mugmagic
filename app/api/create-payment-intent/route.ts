@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { validateRequest, errorResponse, getIP } from '@/lib/api-utils';
 import { createPaymentIntentSchema, CartItemInput } from '@/lib/validation-schemas';
@@ -68,6 +69,27 @@ async function calculateOrderAmountFromVariants(
 
         if (!variant.is_available) {
             throw new Error(`Variant ${variant.name} is no longer available`);
+        }
+
+        // SECURITY: Validate that variant belongs to the specified product
+        // This prevents price manipulation by sending mismatched product/variant IDs
+        if (item.productId && variant.product_id !== item.productId) {
+            throw new Error(
+                `Security violation: Variant ${variant.id} does not belong to product ${item.productId}`
+            );
+        }
+
+        // SECURITY: Validate quantity is within reasonable limits
+        if (item.quantity < 1 || item.quantity > 99) {
+            throw new Error(`Invalid quantity: ${item.quantity}. Must be between 1 and 99`);
+        }
+
+        // SECURITY: Validate stock availability
+        if (variant.stock_quantity < item.quantity) {
+            throw new Error(
+                `Insufficient stock for ${variant.name}. ` +
+                `Available: ${variant.stock_quantity}, Requested: ${item.quantity}`
+            );
         }
 
         // Use variant's price directly (no modifiers needed)
@@ -144,7 +166,7 @@ async function handlePaymentIntentCreation(req: Request) {
 
         // Create Stripe Payment Intent with idempotency
         const idempotencyKey = getIdempotencyKey(req);
-        const stripeIdempotencyKey = idempotencyKey || `pi_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const stripeIdempotencyKey = idempotencyKey || `pi_${randomUUID()}`;
 
         const paymentIntent = await stripe.paymentIntents.create({
             amount: Math.round(amount * 100), // Convert to cents

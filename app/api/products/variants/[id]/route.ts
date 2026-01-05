@@ -11,9 +11,10 @@ const updateVariantSchema = z.object({
 
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const body = await request.json();
 
         // Validation
@@ -25,7 +26,7 @@ export async function PATCH(
             );
         }
 
-        const success = await updateVariant(params.id, result.data);
+        const success = await updateVariant(id, result.data);
 
         if (!success) {
             return NextResponse.json(

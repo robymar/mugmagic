@@ -3,6 +3,8 @@
  * Helper functions for checkout flow with stock reservations
  */
 
+import { randomUUID } from 'crypto';
+
 export interface CheckoutReservation {
     checkout_id: string;
     expires_at: string;
@@ -53,12 +55,11 @@ export async function initializeCheckout(items: Array<{
 
 /**
  * Generate idempotency key for payment intent
+ * Uses cryptographically secure random UUID
  */
 export function generateIdempotencyKey(userId?: string): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
     const userPart = userId ? `${userId}_` : '';
-    return `${userPart}${timestamp}_${random}`;
+    return `${userPart}${randomUUID()}`;
 }
 
 /**

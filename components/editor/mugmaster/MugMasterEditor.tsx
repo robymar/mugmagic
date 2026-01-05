@@ -35,7 +35,14 @@ interface MugMasterEditorProps {
 export default function MugMasterEditor({ productId, product, initialDesign, designId, cartItemId }: MugMasterEditorProps) {
     const [activeTab, setActiveTab] = useState<ActiveTab>('text');
     const { items: cartItems, addItem, toggleCart } = useCartStore();
-    const { canvas, saveDesign, addText, addImage, loadDesign } = useDesignStore();
+    const { canvas, saveDesign, addText, addImage, loadDesign, setProduct } = useDesignStore();
+
+    // Sync product to store
+    React.useEffect(() => {
+        if (product) {
+            setProduct(product);
+        }
+    }, [product, setProduct]);
 
     // Load initial design template OR saved design OR cart item design
     React.useEffect(() => {

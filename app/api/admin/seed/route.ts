@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/api-utils';
 
 export async function POST(request: Request) {
     try {
-        // CRITICAL: Only authenticated admin users should seed the database
+        // CRITICAL SECURITY: Verify admin role from profiles table
         const user = await requireAuth(request, 'admin');
 
         if (!user) {
@@ -15,14 +15,44 @@ export async function POST(request: Request) {
             );
         }
 
-        // SECURITY: In production, check if user has admin role
-        // For now, any authenticated user can seed (development only)
+        // Double-check admin role in production
         if (process.env.NODE_ENV === 'production') {
-            // TODO: Check user.role === 'admin' or similar
-            return NextResponse.json(
-                { error: 'Seed endpoint disabled in production' },
-                { status: 403 }
+            // Import Supabase client
+            const { createServerClient } = await import('@supabase/ssr');
+            const { cookies } = await import('next/headers');
+
+            const cookieStore = await cookies();
+            const supabase = createServerClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                {
+                    cookies: {
+                        getAll() { return cookieStore.getAll(); },
+                        setAll(cookiesToSet: any[]) {
+                            try {
+                                cookiesToSet.forEach(({ name, value, options }) =>
+                                    cookieStore.set(name, value, options)
+                                );
+                            } catch { }
+                        },
+                    },
+                }
             );
+
+            // Verify role from profiles table
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            if (!profile || profile.role !== 'admin') {
+                console.warn(`Unauthorized seed attempt by user ${user.id}`);
+                return NextResponse.json(
+                    { error: 'Forbidden - Admin role required' },
+                    { status: 403 }
+                );
+            }
         }
 
         if (process.env.NODE_ENV === 'development') {
